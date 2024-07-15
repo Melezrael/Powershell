@@ -1,0 +1,64 @@
+#cmd able to machine run powershell script
+Set-ExecutionPolicy Unrestricted
+
+#install application
+cd C:\Users\User\Documents\Setupbox\application
+msiexec /i C:\Users\User\Documents\Setupbox\application\PSS_x86.msi /qn
+start-process -wait -FilePath C:\Users\User\Documents\Setupbox\application\npp.8.4.1.Installer.x64.exe -ArgumentList '/S','/V','/qn'  -PassThru
+start-process -wait -FilePath C:\Users\User\Documents\Setupbox\application\ChromeStandaloneSetup64.exe -ArgumentList '/S','/V','/qn'  -PassThru
+Write-Host "PSS Doms Installed"
+Write-Host "Google Chrome Installed"
+Write-Host "Notepad++ Installed"
+
+#start setupbox 
+Write-Output "Starting box setup..."
+
+#Set UAC to low security
+Set-ItemProperty -Path REGISTRY::HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Policies\System -Name EnableLUA -Value 0 -Force
+Write-Host "First Step: User Account Control set to low level Permission ---Done"
+#copyBin new 
+#robocopy D:\Setup\bin  C:\ /E 
+
+#pending ip
+
+#COPY HOSTNAME
+#robocopy D:\Setup\host  C:\Windows\System32\drivers\etc /E
+
+# SetPower neversleep
+Powercfg /Change monitor-timeout-ac 0             
+Powercfg /Change monitor-timeout-dc 0
+Powercfg /Change standby-timeout-ac 0
+Powercfg /Change standby-timeout-dc 0
+Write-Host "Second Step: Set Power to never sleep ---Done"
+
+# Install msmq
+Enable-WindowsOptionalFeature -Online -FeatureName 'MSMQ-Server' -All -NoRestart
+New-MsmqQueue -Name "kioskqueuein" -Queuetype Private -Transactional                     
+New-MsmqQueue -Name "kioskqueueout" -Queuetype Private -Transactional
+New-MsmqQueue -Name "checkqueuein" -Queuetype Private -Transactional 
+New-MsmqQueue -Name "checkqueueout" -Queuetype Private -Transactional 
+Write-Host "Third Step: MSMQ Turned On and PrivateQue Created ---Done"
+
+# turn off firewall
+Get-NetFirewallProfile | Format-Table Name, Enabled               
+Set-NetFirewallProfile -Profile Domain, Public, Private -Enabled False
+Write-Host "4th Step: Firewall TurnOff  ---Done"
+
+#setup remote desktop
+Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -value 0
+Write-Host "5th Step: Remote Desktop Enabled  ---Done"
+
+#set password for User
+$pass = Read-Host "Need your help : Please enter default password " -AsSecureString
+Get-LocalUser -Name "User" | Set-LocalUser -Password $pass
+Write-Host "6th Step: Password have been set  ---Done"
+
+
+
+#RENAME PC -Restart
+$hostname = Read-Host
+Rename-Computer -Newname $hostname       
+Restart-computer
+Write-Host "Hostname Updated... Restarting....."
+
+
