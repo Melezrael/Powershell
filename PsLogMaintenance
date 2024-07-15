@@ -1,0 +1,32 @@
+#PSlogmaintenance.ps1
+
+#1.Check file log size
+#old.cvs as pslogfile
+$targetpath = "C:\SBCRemediation\PSLogs\PSMonitorSBCWebSitev4.0.txt"
+$filesize = (Get-Item -Path $targetpath).Length
+$foldername = (Get-Date).ToString("dd.MM.yyyy")
+$folderpath = "C:\SBCRemediation\PSLogs\$foldername"
+
+#Write-Host "KB":($filesize/1KB)
+
+#Create new folder with date, if the folder exist, it will not create one 
+#if (!(Test-Path $folderpath -PathType Container)) {
+#    New-Item -ItemType Directory -Path "C:\SBCRemediation\PSLogs" -Name ($foldername)
+
+ #   }
+
+#check with the file size, if exceed 4079, it will stop the task and move the file
+If ($filesize -gt 4079KB) {
+    #Create new folder with date,
+    New-Item -ItemType Directory -Path "C:\SBCRemediation\PSLogs" -Name $foldername
+        #Disable-ScheduledTask -TaskName "Dummy"
+    Move-Item -Path "C:\SBCRemediation\PSLogs\PSMonitorSBCWebSitev4.0.txt" -Destination "C:\SBCRemediation\PSLogs\$foldername"
+
+    Write-Output 'PSLog archived!'
+    }
+
+#enable task
+#enable-ScheduledTask -TaskName "Dummy"
+
+
+
