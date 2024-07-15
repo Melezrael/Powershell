@@ -1,0 +1,29 @@
+#DKMSRemediationLogMaintenance.ps1
+#varieble
+$date = (Get-Date).ToString("yyyyMMdd")
+$time = (Get-Date).ToString("HH-mm-ss")
+
+#log file path
+$file = "DKMS.Console.WebApp-$date.txt"
+
+#new file path to archived logs
+$targetpath = "D:\Apps\DKMS\MB\DKMSRemediationConsoleApp\log\$file"
+
+#check filsize file path
+$filesize = (Get-Item -Path $targetpath).Length
+
+
+#check file size,  
+#if > 4mb, log move to new file with currentdate, then will rename to hours.
+If ($filesize -gt 4079KB) {
+    #Create new folder with date,
+    New-Item -ItemType Directory -Path "D:\Apps\DKMS\MB\DKMSRemediationConsoleApp\log" -Name "DKMS.Console.Webapp$date"
+    Move-Item -Path "$targetpath" -Destination "D:\Apps\DKMS\MB\DKMSRemediationConsoleApp\log\DKMS.Console.Webapp$date" -Force
+    Rename-Item "D:\Apps\DKMS\MB\DKMSRemediationConsoleApp\log\DKMS.Console.Webapp$date\$file" -NewName "$time.txt"
+    #Rename-Item -Path "D:\Apps\DKMS\MB\DKMSRemediationConsoleApp\log\DKMS.Console.Webapp$date" -NewName "DKMS.Console.Webapp$date-$time"
+    Write-Output 'Log archived!'
+    }
+
+    else {
+    Write-Output "log not archived"
+    }
