@@ -8,46 +8,45 @@ $sbcmbfile = "C:\SBCApp\SBC.exe.config", "C:\SBCApp\config.xml" , "C:\SBCApp\web
 $sbcRfile = "C:\SBCRemediation\appsettings.json", "C:\SBCRemediation\Config.xml", "C:\SBCRemediation\log4net.config" 
 $tmsfile = "C:\DKMSRemediationTMS\appsettings.json", "C:\DKMSRemediationTMS\kiosk.ini"
 
-$currentDateTime = Get-Date
-$formattedDateTime = $currentDateTime.ToString("yyyyMMdd") 
+$filedate = Get-Date -Format "ddMMMMyyyy"
 #$source = 'C:\_Maintenance\BackupConfig_$formattedDateTime'
-$kiosk = "$env:COMPUTERNAME-$formattedDateTime" 
+$kiosk = "$env:COMPUTERNAME" 
 
 function BackupConfig {
 
 if(test-path 'C:\DKMSClient')
     {
-    New-Item -Path "C:\_Maintenance\BackupConfig\$kiosk" -ItemType Directory
-    Compress-Archive -Path $dkmsctfile -DestinationPath "C:\_Maintenance\BackupConfig\$kiosk\Clientbackup"
+    New-Item -Path "C:\_Maintenance\BackupConfig\$filedate\$kiosk" -ItemType Directory
+    Compress-Archive -Path $dkmsctfile -DestinationPath "C:\_Maintenance\BackupConfig\$filedate\$kiosk\Clientbackup"
     Write-Output "DKMSClient config backup successfully!"
     }
 
         elseif(test-path 'C:\DKMSRemediation')
         { 
-        New-Item -Path "C:\_Maintenance\BackupConfig\$kiosk" -ItemType Directory
-        Compress-Archive -Path $dkmsRfile -DestinationPath "C:\_Maintenance\BackupConfig\$kiosk\Clientbackup"
+        New-Item -Path "C:\_Maintenance\BackupConfig\$filedate\$kiosk" -ItemType Directory
+        Compress-Archive -Path $dkmsRfile -DestinationPath "C:\_Maintenance\BackupConfig\$filedate\$kiosk\Clientbackup"
         Write-Output "DKMSRemediation config backup successfully!"
         }
 
             elseif(test-path 'C:\DKMS')
             { 
-           New-Item -Path "C:\_Maintenance\BackupConfig\$kiosk" -ItemType Directory
-            Compress-Archive -Path $dkmsmbfile -DestinationPath "C:\_Maintenance\BackupConfig\$kiosk\Clientbackup"
+           New-Item -Path "C:\_Maintenance\BackupConfig\$filedate\$kiosk" -ItemType Directory
+            Compress-Archive -Path $dkmsmbfile -DestinationPath "C:\_Maintenance\BackupConfig\$filedate\$kiosk\Clientbackup"
             Write-Output "DKMS config backup successfully!"
            
             }
 
                 elseif (test-path 'C:\SBCApp')
                 {
-                New-Item -Path "C:\_Maintenance\BackupConfig\$kiosk" -ItemType Directory
-                 Compress-Archive -Path $sbcfile -DestinationPath "C:\_Maintenance\BackupConfig\$kiosk\SBCbackup"
+                New-Item -Path "C:\_Maintenance\BackupConfig\$filedate\$kiosk" -ItemType Directory
+                 Compress-Archive -Path $sbcfile -DestinationPath "C:\_Maintenance\BackupConfig\$filedate\$kiosk\SBCbackup"
                  Write-Output "SBC config backup successfully!"
                 }
 
                     else
                     {
-                    New-Item -Path "C:\_Maintenance\BackupConfig\$kiosk" -ItemType Directory
-                    Compress-Archive -Path $sbcRfile -DestinationPath "C:\_Maintenance\BackupConfig\$kiosk\SBCbackup"
+                    New-Item -Path "C:\_Maintenance\BackupConfig\$filedate\$kiosk" -ItemType Directory
+                    Compress-Archive -Path $sbcRfile -DestinationPath "C:\_Maintenance\BackupConfig\$filedate\$kiosk\SBCbackup"
                     Write-Output "SBCRemediation config backup successfully!"
                     }
   
@@ -63,8 +62,8 @@ if(test-path 'C:\DKMSRemediationTMS')
 
     {
     
-    New-Item -Path "C:\_Maintenance\BackupConfig\$tmskiosk" -ItemType Directory
-    Compress-Archive -Path $tmsfile -DestinationPath "C:\_Maintenance\BackupConfig\$kiosk\TMSbackup"
+    New-Item -Path "C:\_Maintenance\BackupConfig\$filedate\$tmskiosk" -ItemType Directory
+    Compress-Archive -Path $tmsfile -DestinationPath "C:\_Maintenance\BackupConfig\$filedate\$kiosk\TMSbackup"
     Write-Output "TMS config backup done!"
     }
 
