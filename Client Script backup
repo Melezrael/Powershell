@@ -1,0 +1,7 @@
+$filedate = Get-Date -Format "ddMMMMyyyy"
+$cred = Import-Clixml "C:\Users\dkmsadm\Desktop\Orange\Remoting\mycredentials.xml"
+$Session = New-PSSession -ComputerName "10.90.7.4" -Credential $cred
+
+Copy-Item "C:\_Maintenance\BackupConfig\$filedate\" -Destination "C:\Users\dkmsadm\Documents\Backup\P4Client" -recurse -FromSession $Session
+Remove-PSSession -Session $session
+Write-Output "P4 backup config completed!"
