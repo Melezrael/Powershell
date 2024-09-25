@@ -1,6 +1,6 @@
 function monitorDKMSClient {	
     $servicename = 'DKMS.Kiosk.WebApp'
-	$maxthreads =48
+	$maxthreads =50
     $currenttime = get-date
     $clientThreads = (Get-Process $servicename -ErrorAction SilentlyContinue | Select-object -ExpandProperty Threads).Count
     Write-Host "***started at:$currenttime with threads:$clientThreads ****"
