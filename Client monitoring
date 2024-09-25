@@ -1,0 +1,27 @@
+function monitorDKMSClient {	
+    $servicename = 'DKMS.Kiosk.WebApp'
+	$maxthreads =48
+    $currenttime = get-date
+    $clientThreads = (Get-Process $servicename -ErrorAction SilentlyContinue | Select-object -ExpandProperty Threads).Count
+    Write-Host "***started at:$currenttime with threads:$clientThreads ****"
+    
+
+    if ($clientThreads -gt $maxthreads) {
+        Write-Host Initiating Client restart, Threads reached $maxthreads limit
+        Stop-Process -name $servicename -Force
+        sleep 30
+        Start-Service -name $servicename
+        Write-Host Restart Client completed!
+        return
+    }
+
+
+    else{
+    write-host DKMSClient Threads is Stable!
+    }
+
+
+    }
+
+    monitorDKMSClient
+    
