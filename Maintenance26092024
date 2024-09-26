@@ -1,0 +1,889 @@
+$Debug=0  # 1 : debug mode: will not delete any log. include eventlog
+          # 0 : Normal mode: will delete files
+
+$DeleteEventLogs=1  # 1: delete,  0: no delete.  use this for testing script
+
+
+# ============== Begin Config 
+
+if(test-Path 'C:\SBCRemediation'){
+    # SBC Computer
+    $MD5HashApps=@('c:\SBCRemediation\DKMS.SBC.WebApp.exe')  # ## file hash and version info
+    $Process=@('DKMS.SBC.WebApp')  # ## cpu ram usage
+    $BackupFolders=@('c:\SBCRemediation\log','c:\SBCRemediation\PSLogs')
+    $ScreenshotApps=@('mspaint','notepad')
+    $ScreenshotApps=@()
+}
+else{
+    
+    # Kiosk Computer
+
+    if(test-Path 'C:\DKMSClient'){
+        ## KT/BT
+        $MD5HashApps=@('C:\DKMSClient\DKMSKiosk.exe')  # ## file hash and version info
+        $Process=@('DKMSKiosk')  # ## cpu ram usage
+        $BackupFolders=@('C:\DKMSClient\log','C:\DKMSClient\transaction')
+        $ScreenshotApps=@('DKMSKiosk')
+    }
+    else{
+        # PPT
+        $MD5HashApps=@('C:\DKMSRemediation\DKMS.Kiosk.WebApp.exe')  # ## file hash and version info
+        $Process=@('DKMS.Kiosk.WebApp')  # ## cpu ram usage
+        $BackupFolders=@('C:\DKMSRemediation\log','C:\DKMSRemediation\transaction', 'C:\DKMSRemediation\LEDChangeStateTrace','C:\DKMSRemediation\PSLogs')
+        $ScreenshotApps=@('DKMS.Kiosk.WebApp')
+    }
+}
+
+# ============== End Config
+
+$hostname=(Get-CimInstance -classname win32_computersystem).Name
+$dt = (get-date -f yyyyMMdd)
+
+$Ports=@('455','355','255','155')
+
+
+#ppt1 155
+#brani 255
+#keppel 255
+#ppt2 355
+#mb 455
+
+$TopRankUsage=5
+$MaxLogWEntries=2 #1000
+
+$ArchiveFolder_Final="C:\_Maintenance\ArchivedLogs\" # Must end with a backsplash. do not move this line
+
+$ArchiveName="ArchivedLogs_" + $hostname + "_$dt"
+$ArchiveFolder_Tmp="C:\$ArchiveName\" # Must end with a backsplash
+$ZipTarget = "$ArchiveFolder_Final\$ArchiveName.zip"
+
+$OutFile="$ArchiveFolder_Tmp$hostname.$dt.txt"
+$ReportFile="$ArchiveFolder_Tmp$hostname.$dt.html"
+
+
+$global:ReportSummary = [Environment]::NewLine
+
+Function AddToSummary($str){
+
+    if($str -eq $null){
+        return
+    }
+
+    if($str -is [String]){
+        $global:ReportSummary +=  $str + [Environment]::NewLine
+    }
+    else{
+        $global:ReportSummary += (Out-String -InputObject $str -Width 200)  + [Environment]::NewLine
+    }
+
+  #write-output $str
+  #write-output $ReportSummary
+  #Read-host "Press enter to exit."
+}
+
+Function prn ($str){
+#param(
+    #[Parameter(Mandatory=$True,ValueFromPipeline=$True)]
+    #[object]$str = $null
+#)
+
+    Write-Output $str
+
+    if($str -eq $null){
+        return
+    }
+
+    if($str -is [String]){
+        Add-Content $OutFile $str
+    }
+    else{
+        #$x = Out-String -InputObject $str -Width 100
+        #Add-Content $OutFile $x #| Set-Content
+        Add-Content $OutFile (Out-String -InputObject $str -Width 200)
+    }
+    
+}
+
+Function Border{
+    Param
+    (
+         [Parameter(Mandatory=$true, Position=0)]
+         [string] $str
+         #,
+         #[Parameter(Mandatory=$true, Position=1)]
+         #[int] $len
+    )
+    $str += " for host $hostname"
+
+    $tl= "╔" ; $tr= "╗" ; $bl= "╚" ; $br= "╝"
+    
+    $bv="║" ; $bh="═"
+
+    $len = 60
+
+
+    if ($str.length -gt $len) {
+        $len= $str.length + 10 # 5 spaces left & right
+    }
+
+    $spacing = [math]::floor(($len - $str.length)/2)
+
+    $spacing = " " * $spacing
+
+    $pad= " " * ($len - ($spacing.length*2) - $str.Length)
+
+    prn "$($tl)$($bh * $len)$($tr)"
+    prn "$($bv)$(" " * $len)$($bv)"
+    prn "$($bv)$($spacing)$($str)$($spacing)$($pad)$($bv)"
+    prn "$($bv)$(" " * $len)$($bv)"
+    prn "$($bl)$($bh * $len)$($br)"
+
+}
+
+Function GetAvailResources(){
+    
+    $Array = @()
+
+    $Server=$hostname
+    #prn $sep
+    #prn 'Total Resource'
+    #prn $sep
+    Border 'System Summary'
+    #prn  "Processing $Server machine"
+ 
+    $Check = $null
+    $Processor = $null
+    $ComputerMemory = $null
+    $RoundMemory = $null
+    $Object = $null
+ 
+    # Creating custom object
+    $Object = New-Object PSCustomObject
+    $Object | Add-Member -MemberType NoteProperty -Name "DKMS Client Name" -Value $hostname
+ 
+    $Check = Test-Path -Path "\\$Server\c$" -ErrorAction SilentlyContinue
+    $Check="True"
+
+    If($Check -match "True")
+    {
+        $Status = "True"
+ 
+        Try
+        {
+            # Processor utilization
+            $Processor = (Get-WmiObject -ComputerName $Server -Class win32_processor -ErrorAction Stop | Measure-Object -Property LoadPercentage -Average | Select-Object Average).Average
+  
+            # Memory utilization
+            $ComputerMemory = Get-WmiObject -ComputerName $Server -Class win32_operatingsystem -ErrorAction Stop
+            $Memory = ((($ComputerMemory.TotalVisibleMemorySize - $ComputerMemory.FreePhysicalMemory)*100)/ $ComputerMemory.TotalVisibleMemorySize)
+            $RoundMemory = [math]::Round($Memory, 2)
+        }
+        Catch
+        {
+            Write-Host "Something went wrong" -ForegroundColor Red
+            Continue
+        }
+ 
+        If(!$Processor -and $RoundMemory)
+        {
+            #$RoundMemory = "(null)"
+            #$Processor = "(null)"
+        }
+ 
+        $Object | Add-Member -MemberType NoteProperty -Name "Is online?" -Value $Status
+        $Object | Add-Member -MemberType NoteProperty -Name "Total RAM" -Value  $ComputerMemory.TotalVisibleMemorySize.ToString('N2')
+        $Object | Add-Member -MemberType NoteProperty -Name "Free RAM" -Value  $ComputerMemory.FreePhysicalMemory.ToString('N2')
+        $Object | Add-Member -MemberType NoteProperty -Name "Memory %" -Value $RoundMemory 
+        $Object | Add-Member -MemberType NoteProperty -Name "CPU %" -Value $Processor 
+ 
+        # Display resutls for single server in realtime
+        #$Object
+  
+        # Adding custom object to our array
+        $Array += $Object
+    }
+    Else
+    {
+        $Object | Add-Member -MemberType NoteProperty -Name "Is online?" -Value "False"
+        $Object | Add-Member -MemberType NoteProperty -Name "Memory %" -Value "(null)" 
+        $Object | Add-Member -MemberType NoteProperty -Name "CPU %" -Value "(null)" 
+         
+        # Display resutls for single server in realtime
+        #$Object
+  
+        # Adding custom object to our array
+        $Array += $Object
+    }
+  
+ 
+    If($Array)
+    { 
+        $str=$Array | Sort-Object "Is online?" | format-table
+        prn  $str
+        AddToSummary $str;
+
+        #$Array | Out-GridView
+        #$Array | Export-Csv -Path "C:\users\$hostname\desktop\results.csv" -NoTypeInformation -Force
+    }
+
+        #prn $sep
+    #prn 'Disk Space'
+    #prn $sep
+    #Border 'Disk Space'
+    $str = Get-WMIObject Win32_LogicalDisk -Filter "DriveType=3" -Computer . | 
+                Select  SystemName, 
+                    DeviceID, 
+                    VolumeName, 
+                    @{Name="Total Size (GB)"; Expression={"{0:N1}" -F ($_.Size/1GB)}}, 
+                    @{Name="Free Space (GB)"; Expression={"{0:N1}" -F ($_.Freespace/1GB)}}, 
+                    @{Name="Free Space %"; Expression={"{0:N1}" -F (($_.Freespace/$_.Size)*100)}} | FT -AutoSize
+
+    prn  $str
+    AddToSummary $str
+
+    #Get-WmiObject -Class Win32_NTEventlogFile | Where-Object LogfileName -Match 'system'
+    #Get-WmiObject -Class Win32_NTEventlogFile | Where-Object LogfileName -Match 'application'
+    #Get-WmiObject -Class Win32_NTEventlogFile | Where-Object LogfileName -Match 'security'
+}
+
+Function GetProcCpuRam(){
+
+    $properties=@(
+        @{Name="Name"; Expression = {$_.name}},
+        @{Name="PID"; Expression = {$_.IDProcess}},
+        @{Name="CPU (%)"; Expression = {$_.PercentProcessorTime}},
+        @{Name="Memory (MB)"; Expression = {[Math]::Round(($_.workingSetPrivate / 1mb),2)}}
+        @{Name="Disk (MB)"; Expression = {[Math]::Round(($_.IODataOperationsPersec / 1mb),2)}}
+        @{Name="Path";Expression = {(Get-Process -Id $_.IDProcess).Path}}
+    )
+
+    $ProcessCPU = Get-WmiObject -class Win32_PerfFormattedData_PerfProc_Process
+
+    
+    $arr= @()
+    foreach ($p in $Process) {
+        $obj= $ProcessCPU | Where-Object {$_.Name -eq $p} | Select-Object $properties
+        $arr += $obj
+    }
+    #prn $sep
+    #prn "Resource usage by DKMS apps"
+    #prn $sep
+    Border "Resource usage by DKMS apps"
+    $arr  = $arr | Format-Table -AutoSize
+    prn  $arr
+    AddToSummary $arr
+
+    $P =   $ProcessCPU | Where-Object {$_.Name -ne "_Total" -and $_.Name -ne "Idle"} |
+        Select-Object $properties |
+        Sort-Object "CPU (%)" -desc |
+        Select-Object -First $TopRankUsage |
+        Format-Table -AutoSize
+
+    #prn $sep
+    #prn "Resource usage sort by CPU"
+    #prn $sep
+    Border "Top $TopRankUsage CPU usage"
+    prn $P
+
+    $P =   $ProcessCPU | Where-Object {$_.Name -ne "_Total" -and $_.Name -ne "Idle"} |
+        Select-Object $properties |
+        Sort-Object "Memory (MB)" -desc |
+        Select-Object -First $TopRankUsage |
+        Format-Table -AutoSize
+
+    #prn $sep
+    #prn "Resource usage sort by RAM"
+    #prn $sep
+    Border "Top $TopRankUsage RAM usage"
+    prn $P
+    ##$ProcessCPU.GetType()
+
+}
+
+Function GetPorts(){
+    
+    $out=""
+    foreach ($p in $Ports) {
+        #prn $sep
+        #Write-Host "netstat -an | findstr $p"
+        #prn $sep
+        Border "netstat -an | findstr $p"
+        cmd.exe /c "netstat -an | findstr $p > tmp.txt"  
+        #$tmp = (&"netstat.exe -an | findstr $p" PCNAME 2>&1) 
+        #$tmp = (cmd.exe /c "dir > tmp.txt | type tmp.txt" 2>&1)
+
+        foreach($line in Get-Content .\tmp.txt) {
+          prn $line
+          AddToSummary $line
+        }
+    }
+}
+
+Function GetFileInfo(){
+    Border "File Info"
+    foreach ($a in $MD5HashApps) {
+        
+        $vi = (dir $a).VersionInfo 
+        $hash = Get-FileHash $a -Algorithm MD5
+        ##$vi | Add-Member  Add-Member Properties  "MD5_HASH" $hash.Hash
+        $vi | add-member -membertype noteproperty -name MD5_HASH -value $hash.Hash | Out-Null
+        
+        ##$vi | fl
+        ##$hash
+        ##$hash.hash
+        ##$vi | gm -MemberType Properties
+        $o = $vi | select -Property * | Sort-Object  -Property name –Descending
+
+        prn "File : $a"
+        prn $o
+    }
+}
+
+Function GetEvents(){
+#Where-Object {$_.Name -ne "_Total" -and $_.Name -ne "Idle"} |
+    #$obj = Get-WinEvent
+    
+    return Get-WmiObject -Class Win32_NTEventLogFile | Where-Object { 
+        ($_.LogFileName -eq 'system') -or 
+        ($_.LogFileName -eq 'application') -or 
+        ($_.LogFileName -eq 'security')
+    }
+}
+
+Function BackupEventLog(){
+
+    $EvtLogSavTmpPath = $ArchiveFolder_Tmp +"EventLogs\" # Must end with a backsplash
+    #prn $EvtLogSavTmpPath
+
+    New-Item -ItemType Directory -Force -Path $EvtLogSavTmpPath  | Out-Null
+
+    Border "Event logs before archiving"
+    $list = GetEvents 
+    prn $list
+
+    New-Item -ItemType Directory -Force -Path $EvtLogSavTmpPath  | Out-Null
+    Border "Archiving event logs"
+    
+    foreach($l in $list){
+        if($l.NumberOfRecords -gt 1){
+            
+            $logFileName=$l.logFileName
+            $exportFileName = $logFileName + "_" + (get-date -f yyyyMMdd) + ".evt"
+            prn "Archiving Event : $logFileName    exportFileName : $exportFileName"
+
+            $logFile = Get-WmiObject Win32_NTEventlogFile | Where-Object {$_.logfilename -eq $logFileName} 
+            $status = $logFile.backupeventlog($EvtLogSavTmpPath + $exportFileName)
+
+            if(($Debug -eq 0) -and ($DeleteEventLogs -eq 1)){
+                $status = $logFile.ClearEventLog()
+            }
+        }
+        else{
+            ###prn ">>>>> No archiving required for $l.log <<<<<" 
+        }
+
+    }
+    
+    Border "Event logs after archiving"
+    $list = GetEvents 
+    prn $list
+   
+}
+
+function ZipAll(){
+
+    Border "Archive Files" 
+
+
+    foreach($b in $BackupFolders){
+        
+        prn "Backing up $b"
+
+        $c=$b.tolower().replace("c:\","").replace("\","_")
+
+        $target_folder = "$ArchiveFolder_Tmp"+"DKMS_Logs\$c\"
+
+        New-Item -ItemType Directory -Force -Path $target_folder  | Out-Null
+
+        #move files to DKMS_Logs
+        Get-ChildItem –Path $b |
+            Sort-Object LastWriteTime  |
+            Foreach-Object {
+            try{
+                $file = $_.FullName
+                if($Debug){
+                    Copy-Item $file  -Destination $target_folder
+                }
+                else{
+                    Move-Item $file  -Destination $target_folder
+                }
+                
+            }
+            catch{
+            }
+        }
+        #zip the moved files
+        <#
+        #return;
+        goto x
+        #
+        try{
+            
+            $zipfile= "$ArchiveFolder_Tmp$c.zip"
+            prn "creating zip fie $zipfile"
+            $zip = [System.IO.Compression.ZipFile]::Open($zipfile, 'create')
+            ##[System.IO.Compression.ZipFile]::CreateFromDirectory($b, $zipfile)
+            $zip.Dispose()
+
+            #prn "oopening zip file from archiving"
+            #$compressionLevel = [System.IO.Compression.CompressionLevel]::Fastest
+            #$zip = [System.IO.Compression.ZipFile]::Open($zipfile, 'update')
+            
+            
+            #Compress-Archive -Path $b -DestinationPath "$ArchiveFolder_Tmp$c.zip" -Force
+            ##Remove-Item $b"\*" -Recurse #-Force
+
+            prn "adding fils..."
+
+            Get-ChildItem –Path $b |
+            Sort-Object LastWriteTime  |
+            Foreach-Object {
+                try{
+                    $file = $_.FullName
+
+                    write-output "adding  $file to $zipfile"
+                    #[System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $file, (Split-Path $file -Leaf), $compressionLevel) | out-null 
+                    
+                    #[System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $file, $file, $compressionLevel) | out-null 
+                    
+                    [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $file, $file) | out-null
+
+                    write-out "remove $file"
+                    Remove-Item $file -force
+                }catch{
+                    prn "error in $file"
+                }
+            }
+
+            $zip.Dispose()
+        }
+        catch{
+            $s = "$ArchiveFolder_Tmp"+"_ERROR_DIR_NOT_FOUND_"+"$c"
+            prn "$b    $ArchiveFolder_Tmp$c.zip    $s"
+            New-Item $s  | Out-Null
+        }
+        :x
+        #>
+    }
+
+    prn "Zipping archive"
+    Compress-Archive -Path $ArchiveFolder_Tmp -DestinationPath $ZipTarget -Force  
+     
+    # $OutFile is zipped above
+    # now we add extra line in $OutFile below.  so we have 2 slightly diff version.
+
+    prn "Report Completed on : $(get-date -f 'dddd yyyy/MM/dd HH:mm:ss')"  
+    Copy-Item -Path $OutFile -Destination $ArchiveFolder_Final | Out-Null
+    Copy-Item -Path $ReportFile -Destination $ArchiveFolder_Final | Out-Null
+    
+    # remove temp work files
+    #Remove-Item $ArchiveFolder_Tmp  -Recurse
+
+}
+
+Function Take-ScreenShot { 
+    <#   
+.SYNOPSIS   
+    Used to take a screenshot of the desktop or the active window.  
+.DESCRIPTION   
+    Used to take a screenshot of the desktop or the active window and save to an image file if needed. 
+.PARAMETER screen 
+    Screenshot of the entire screen 
+.PARAMETER activewindow 
+    Screenshot of the active window 
+.PARAMETER file 
+    Name of the file to save as. Default is image.bmp 
+.PARAMETER imagetype 
+    Type of image being saved. Can use JPEG,BMP,PNG. Default is bitmap(bmp)   
+.PARAMETER print 
+    Sends the screenshot directly to your default printer       
+.INPUTS 
+.OUTPUTS     
+.NOTES   
+    Name: Take-ScreenShot 
+    Author: Boe Prox 
+    DateCreated: 07/25/2010      
+.EXAMPLE   
+    Take-ScreenShot -activewindow 
+    Takes a screen shot of the active window         
+.EXAMPLE   
+    Take-ScreenShot -Screen 
+    Takes a screenshot of the entire desktop 
+.EXAMPLE   
+    Take-ScreenShot -activewindow -file "C:\image.bmp" -imagetype bmp 
+    Takes a screenshot of the active window and saves the file named image.bmp with the image being bitmap 
+.EXAMPLE   
+    Take-ScreenShot -screen -file "C:\image.png" -imagetype png     
+    Takes a screenshot of the entire desktop and saves the file named image.png with the image being png 
+.EXAMPLE   
+    Take-ScreenShot -Screen -print 
+    Takes a screenshot of the entire desktop and sends to a printer 
+.EXAMPLE   
+    Take-ScreenShot -ActiveWindow -print 
+    Takes a screenshot of the active window and sends to a printer     
+#>   
+#Requires -Version 2 
+        [cmdletbinding( 
+                SupportsShouldProcess = $True, 
+                DefaultParameterSetName = "screen", 
+                ConfirmImpact = "low" 
+        )] 
+Param ( 
+       [Parameter( 
+            Mandatory = $False, 
+            ParameterSetName = "screen", 
+            ValueFromPipeline = $True)] 
+            [switch]$screen, 
+       [Parameter( 
+            Mandatory = $False, 
+            ParameterSetName = "window", 
+            ValueFromPipeline = $False)] 
+            [switch]$activewindow, 
+       [Parameter( 
+            Mandatory = $False, 
+            ParameterSetName = "", 
+            ValueFromPipeline = $False)] 
+            [string]$file,  
+       [Parameter( 
+            Mandatory = $False, 
+            ParameterSetName = "", 
+            ValueFromPipeline = $False)] 
+            [string] 
+            [ValidateSet("bmp","jpeg","png")] 
+            $imagetype = "bmp", 
+       [Parameter( 
+            Mandatory = $False, 
+            ParameterSetName = "", 
+            ValueFromPipeline = $False)] 
+            [switch]$print                        
+        
+) 
+# C# code 
+$code = @' 
+using System; 
+using System.Runtime.InteropServices; 
+using System.Drawing; 
+using System.Drawing.Imaging; 
+namespace ScreenShotDemo 
+{ 
+  /// <summary> 
+  /// Provides functions to capture the entire screen, or a particular window, and save it to a file. 
+  /// </summary> 
+  public class ScreenCapture 
+  { 
+    /// <summary> 
+    /// Creates an Image object containing a screen shot the active window 
+    /// </summary> 
+    /// <returns></returns> 
+    public Image CaptureActiveWindow() 
+    { 
+      return CaptureWindow( User32.GetForegroundWindow() ); 
+    } 
+    /// <summary> 
+    /// Creates an Image object containing a screen shot of the entire desktop 
+    /// </summary> 
+    /// <returns></returns> 
+    public Image CaptureScreen() 
+    { 
+      return CaptureWindow( User32.GetDesktopWindow() ); 
+    }     
+    /// <summary> 
+    /// Creates an Image object containing a screen shot of a specific window 
+    /// </summary> 
+    /// <param name="handle">The handle to the window. (In windows forms, this is obtained by the Handle property)</param> 
+    /// <returns></returns> 
+    private Image CaptureWindow(IntPtr handle) 
+    { 
+      // get te hDC of the target window 
+      IntPtr hdcSrc = User32.GetWindowDC(handle); 
+      // get the size 
+      User32.RECT windowRect = new User32.RECT(); 
+      User32.GetWindowRect(handle,ref windowRect); 
+      int width = windowRect.right - windowRect.left; 
+      int height = windowRect.bottom - windowRect.top; 
+      // create a device context we can copy to 
+      IntPtr hdcDest = GDI32.CreateCompatibleDC(hdcSrc); 
+      // create a bitmap we can copy it to, 
+      // using GetDeviceCaps to get the width/height 
+      IntPtr hBitmap = GDI32.CreateCompatibleBitmap(hdcSrc,width,height); 
+      // select the bitmap object 
+      IntPtr hOld = GDI32.SelectObject(hdcDest,hBitmap); 
+      // bitblt over 
+      GDI32.BitBlt(hdcDest,0,0,width,height,hdcSrc,0,0,GDI32.SRCCOPY); 
+      // restore selection 
+      GDI32.SelectObject(hdcDest,hOld); 
+      // clean up 
+      GDI32.DeleteDC(hdcDest); 
+      User32.ReleaseDC(handle,hdcSrc); 
+      // get a .NET image object for it 
+      Image img = Image.FromHbitmap(hBitmap); 
+      // free up the Bitmap object 
+      GDI32.DeleteObject(hBitmap); 
+      return img; 
+    } 
+    /// <summary> 
+    /// Captures a screen shot of the active window, and saves it to a file 
+    /// </summary> 
+    /// <param name="filename"></param> 
+    /// <param name="format"></param> 
+    public void CaptureActiveWindowToFile(string filename, ImageFormat format) 
+    { 
+      Image img = CaptureActiveWindow(); 
+      img.Save(filename,format); 
+    } 
+    /// <summary> 
+    /// Captures a screen shot of the entire desktop, and saves it to a file 
+    /// </summary> 
+    /// <param name="filename"></param> 
+    /// <param name="format"></param> 
+    public void CaptureScreenToFile(string filename, ImageFormat format) 
+    { 
+      Image img = CaptureScreen(); 
+      img.Save(filename,format); 
+    }     
+    
+    /// <summary> 
+    /// Helper class containing Gdi32 API functions 
+    /// </summary> 
+    private class GDI32 
+    { 
+       
+      public const int SRCCOPY = 0x00CC0020; // BitBlt dwRop parameter 
+      [DllImport("gdi32.dll")] 
+      public static extern bool BitBlt(IntPtr hObject,int nXDest,int nYDest, 
+        int nWidth,int nHeight,IntPtr hObjectSource, 
+        int nXSrc,int nYSrc,int dwRop); 
+      [DllImport("gdi32.dll")] 
+      public static extern IntPtr CreateCompatibleBitmap(IntPtr hDC,int nWidth, 
+        int nHeight); 
+      [DllImport("gdi32.dll")] 
+      public static extern IntPtr CreateCompatibleDC(IntPtr hDC); 
+      [DllImport("gdi32.dll")] 
+      public static extern bool DeleteDC(IntPtr hDC); 
+      [DllImport("gdi32.dll")] 
+      public static extern bool DeleteObject(IntPtr hObject); 
+      [DllImport("gdi32.dll")] 
+      public static extern IntPtr SelectObject(IntPtr hDC,IntPtr hObject); 
+    } 
+ 
+    /// <summary> 
+    /// Helper class containing User32 API functions 
+    /// </summary> 
+    private class User32 
+    { 
+      [StructLayout(LayoutKind.Sequential)] 
+      public struct RECT 
+      { 
+        public int left; 
+        public int top; 
+        public int right; 
+        public int bottom; 
+      } 
+      [DllImport("user32.dll")] 
+      public static extern IntPtr GetDesktopWindow(); 
+      [DllImport("user32.dll")] 
+      public static extern IntPtr GetWindowDC(IntPtr hWnd); 
+      [DllImport("user32.dll")] 
+      public static extern IntPtr ReleaseDC(IntPtr hWnd,IntPtr hDC); 
+      [DllImport("user32.dll")] 
+      public static extern IntPtr GetWindowRect(IntPtr hWnd,ref RECT rect); 
+      [DllImport("user32.dll")] 
+      public static extern IntPtr GetForegroundWindow();       
+    } 
+  } 
+} 
+'@ 
+#User Add-Type to import the code 
+add-type $code -ReferencedAssemblies 'System.Windows.Forms','System.Drawing' 
+#Create the object for the Function 
+$capture = New-Object ScreenShotDemo.ScreenCapture 
+ 
+#Take screenshot of the entire screen 
+If ($Screen) { 
+    Write-Verbose "Taking screenshot of entire desktop" 
+    #Save to a file 
+    If ($file) { 
+        If ($file -eq "") { 
+            $file = "$pwd\image.bmp" 
+            } 
+        Write-Verbose "Creating screen file: $file with imagetype of $imagetype" 
+        $capture.CaptureScreenToFile($file,$imagetype) 
+        } 
+    ElseIf ($print) { 
+        $img = $Capture.CaptureScreen() 
+        $pd = New-Object System.Drawing.Printing.PrintDocument 
+        $pd.Add_PrintPage({$_.Graphics.DrawImage(([System.Drawing.Image]$img), 0, 0)}) 
+        $pd.Print() 
+        }         
+    Else { 
+        $capture.CaptureScreen() 
+        } 
+    } 
+#Take screenshot of the active window     
+If ($ActiveWindow) { 
+    Write-Verbose "Taking screenshot of the active window" 
+    #Save to a file 
+    If ($file) { 
+        If ($file -eq "") { 
+            $file = "$pwd\image.bmp" 
+            } 
+        Write-Verbose "Creating activewindow file: $file with imagetype of $imagetype" 
+        $capture.CaptureActiveWindowToFile($file,$imagetype) 
+        } 
+    ElseIf ($print) { 
+        $img = $Capture.CaptureActiveWindow() 
+        $pd = New-Object System.Drawing.Printing.PrintDocument 
+        $pd.Add_PrintPage({$_.Graphics.DrawImage(([System.Drawing.Image]$img), 0, 0)}) 
+        $pd.Print() 
+        }         
+    Else { 
+        $capture.CaptureActiveWindow() 
+        }     
+    }      
+}    
+
+Function ScreenShot(){
+    $sig = '[DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+    [DllImport("user32.dll")] public static extern int SetForegroundWindow(IntPtr hwnd);'
+
+    $type = Add-Type -MemberDefinition $sig -Name WindowAPI -PassThru 
+    
+
+    foreach($s in $ScreenshotApps){
+        write-output $s
+
+        $hwnd = @(Get-Process $s)[0].MainWindowHandle
+        if($hwnd -ne 0){
+            $type::ShowWindow($hwnd, 3) | Out-Null # show maximized
+            Start-Sleep -Milliseconds 500
+            #$type::ShowWindowAsync($hwnd, 5) | Out-Null
+            #Start-Sleep -Milliseconds 100
+            $type::SetForegroundWindow($hwnd) | Out-Null
+            Start-Sleep -Milliseconds 500
+            Take-ScreenShot -activewindow -file $ArchiveFolder_Tmp"screenshot_$s.jpg" -imagetype jpeg
+            Start-Sleep -Milliseconds 1000
+        }
+     }
+}
+
+Function GetNetworkInfo(){
+  Border "Network configuration"
+  $Networks = Get-WmiObject win32_networkadapterconfiguration | ? {$_.IPEnabled}
+
+  foreach($net in $Networks){
+    #prn $net
+    prn "DHCPEnabled      : $($net.DHCPEnabled)"
+    prn "IPAddress        : $($net.IPAddress -join ',')"
+    prn "Subnet Mask      : $($net.ipsubnet[0])"
+    prn "DNS Servers      : $($net.DNSSearchOrder -join ',')"
+    prn "Gateway          : $($net.DefaultIPgateway -join ',')"
+    prn ""
+  }
+}
+
+Function GenHTMLReport(){
+  
+  Add-Content $ReportFile "<html><body>"
+
+  # ================== images
+  Get-ChildItem $ArchiveFolder_Tmp -Filter *.jpg |
+  ForEach{
+    write-output $_.FullName
+    $reader=[system.io.file]::openread($_.FullName)
+    $sz=9000 # multiple of 3K
+    $buf=new-object byte[] $sz
+    $bytesRead=0
+
+    Add-Content $ReportFile "<img width='800' alt='$_' src='data:image/jpg;base64,"
+    do{
+      $bytesRead=$reader.Read($buf,0,$sz);
+      Add-Content $ReportFile ([convert]::ToBase64String($buf,0,$bytesRead))
+    }
+    while ($bytesRead -eq $sz)
+    Add-Content $ReportFile "'>"
+  }
+
+  # ================== report data
+  Add-Content $ReportFile "<pre>$ReportSummary</pre>"
+
+  # ================== close html
+  Add-Content $ReportFile "</body></html>"
+}
+Function DisableTaskSchedular($flag)
+{
+	if((test-Path 'C:\SBCRemediation') -and $flag){
+		Write-Host disabling task schedular:$flag
+		Get-ScheduledTask -TaskPath "\" -TaskName "DKMSRemediation_MonitorSBCWeb" | Stop-ScheduledTask | Disable-ScheduledTask
+	} 
+	elseif ((test-Path 'C:\SBCRemediation') -and  !$flag){
+		Write-Host enabling task schedular:$flag
+		Get-ScheduledTask -TaskPath "\" -TaskName "DKMSRemediation_MonitorSBCWeb" | Enable-ScheduledTask
+	}
+   
+}
+
+function CheckDKMSorSBCWinServiceStartTime
+{
+  
+
+if(test-Path 'C:\SBCRemediation')
+{
+	$servicename ='DKMS.SBC.WebApp'
+$restart_history_outfilepath = 'C:\SBCRemediation\PSLogs\SBCrestartHistory.txt'
+}
+
+ 
+elseif(test-Path 'C:\DKMSRemediation'){
+	$servicename ='DKMS.Kiosk.WebApp'
+	$restart_history_outfilepath = 'C:\SBCRemediation\PSLogs\SBCrestartHistory.txt'
+}
+(Get-EventLog -LogName System -Source "Service Control Manager" -after (Get-Date).AddDays(-10) | Select-Object -Property TimeGenerated, EntryType, Source, Message) -match $servicename | Sort-Object TimeGenerated | Format-Table -AutoSize -Wrap | Out-File -FilePath $restart_history_outfilepath
+}
+
+ 
+
+	
+
+Function DoAll(){
+
+    # create folder first in order to log
+    New-Item -ItemType Directory -Force -Path $ArchiveFolder_Tmp  | Out-Null
+    New-Item -ItemType Directory -Force -Path $ArchiveFolder_Final  | Out-Null
+        
+    prn "Maintenance Script Version : 2022-02-24"
+    prn "Report Timestamp : $(get-date -f 'dddd yyyy/MM/dd HH:mm:ss')"
+    
+    ScreenShot # take screenshot first otherwised active app wont go to background
+
+    GetFileInfo
+  CheckDKMSorSBCWinServiceStartTime
+    GetAvailResources
+    GetProcCpuRam
+
+    GetNetworkInfo
+    GetPorts
+    
+    BackupEventLog
+
+    GenHTMLReport
+	
+	
+    DisableTaskSchedular($true)
+    ZipAll
+	DisableTaskSchedular($false)
+	
+    
+}
+
+DoAll
+
