@@ -751,29 +751,49 @@ If ($ActiveWindow) {
         }     
     }      
 }    
+[Reflection.Assembly]::LoadWithPartialName("System.Drawing")
+Function ScreenShot([Drawing.Rectangle]$bounds, $path){
 
-Function ScreenShot(){
-    $sig = '[DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
-    [DllImport("user32.dll")] public static extern int SetForegroundWindow(IntPtr hwnd);'
+	start-process -filepath 'C:\DKMSRemediation\DKMS.Kiosk.WebApp_Deployment\DKMS.Kiosk.WebApp_Deployment\LaunchKioskClient.bat'
+    sleep 5
+	
+	[Reflection.Assembly]::LoadWithPartialName("System.Drawing")
+	$bmp = New-Object Drawing.Bitmap $bounds.width, $bounds.height
+	$graphics = [Drawing.Graphics]::FromImage($bmp)
+   
+    $graphics.CopyFromScreen($bounds.Location, [Drawing.Point]::Empty, $bounds.size)
+   
+    $bmp.Save($path)
+   
+    $graphics.Dispose()
+    $bmp.Dispose()
+}
 
-    $type = Add-Type -MemberDefinition $sig -Name WindowAPI -PassThru 
+$bounds = [Drawing.Rectangle]::FromLTRB(0, 0, 1000, 900)
+screenshot $bounds "C:\DKMSRemediation\DKMS.Kiosk.WebApp_Deployment\screenshot.png" # change path to somewhere writable
+	
+	
+    #$sig = '[DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+    #[DllImport("user32.dll")] public static extern int SetForegroundWindow(IntPtr hwnd);'
+
+    #$type = Add-Type -MemberDefinition $sig -Name WindowAPI -PassThru 
     
 
-    foreach($s in $ScreenshotApps){
-        write-output $s
+    #foreach($s in $ScreenshotApps){
+    #    write-output $s
 
-        $hwnd = @(Get-Process $s)[0].MainWindowHandle
-        if($hwnd -ne 0){
-            $type::ShowWindow($hwnd, 3) | Out-Null # show maximized
-            Start-Sleep -Milliseconds 500
-            #$type::ShowWindowAsync($hwnd, 5) | Out-Null
-            #Start-Sleep -Milliseconds 100
-            $type::SetForegroundWindow($hwnd) | Out-Null
-            Start-Sleep -Milliseconds 500
-            Take-ScreenShot -activewindow -file $ArchiveFolder_Tmp"screenshot_$s.jpg" -imagetype jpeg
-            Start-Sleep -Milliseconds 1000
-        }
-     }
+    #    $hwnd = @(Get-Process $s)[0].MainWindowHandle
+    #    if($hwnd -ne 0){
+    #        $type::ShowWindow($hwnd, 3) | Out-Null # show maximized
+    #        Start-Sleep -Milliseconds 500
+    #        #$type::ShowWindowAsync($hwnd, 5) | Out-Null
+    #       #Start-Sleep -Milliseconds 100
+    #       $type::SetForegroundWindow($hwnd) | Out-Null
+     #       Start-Sleep -Milliseconds 500
+      #      Take-ScreenShot -activewindow -file $ArchiveFolder_Tmp"screenshot_$s.jpg" -imagetype jpeg
+       #     Start-Sleep -Milliseconds 1000
+        #}
+ #    }
 }
 
 Function GetNetworkInfo(){
