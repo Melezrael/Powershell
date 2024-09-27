@@ -1,0 +1,2 @@
+Register-ScheduledTask -Xml (get-content 'C:\DKMSRemediation\WindowServiceScript\DKMSRemediation_BackupV2.xml' | out-string) -TaskName "DKMSRemediation_BackupV2" -User user –Force
+Disable-ScheduledTask -TaskName "DKMSRemediation_BackupV2"
