@@ -794,7 +794,7 @@ screenshot $bounds "C:\DKMSRemediation\DKMS.Kiosk.WebApp_Deployment\screenshot.p
        #     Start-Sleep -Milliseconds 1000
         #}
  #    }
-}
+
 
 Function GetNetworkInfo(){
   Border "Network configuration"
@@ -906,4 +906,3 @@ Function DoAll(){
 }
 
 DoAll
-
