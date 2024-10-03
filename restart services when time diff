@@ -1,0 +1,39 @@
+
+
+# First we create the request.
+	$HTTP_Request = [System.Net.WebRequest]::Create('http://10.150.76.140:45530/ConsoleApp/GetKioskTMS?where=KioskID="U1"&sortby=volumedesc')
+# We then get a response from the site.
+
+	$HTTP_Response = $HTTP_Request.GetResponse()
+    $Data_stream = $HTTP_Response.GetResponseStream()
+    $streamreader = New-Object System.IO.StreamReader $Data_stream
+    $result = $streamreader.ReadToEnd()
+    #Write-Host $result
+    $kiosk = ConvertFrom-Json $result
+    $timestamp=$kiosk.data | Select-Object -ExpandProperty timestamp 
+    $currentTime = Get-Date # -format "yyyy-MM-dd HH:mm:ss"
+    '*****Current Systemtime : ' +$currentTime  
+    $format = "yyyy-MM-dd HH:mm:ss" 
+    $previousdate= Get-Date $timestamp[1]
+    'TMS Lastupdatedtime in Server : ' +$previousdate
+    $provider = [System.Globalization.CultureInfo]::InvariantCulture 
+    #$result = [DateTime]::ParseExact($timestamp[0], $format, $provider) 
+    #Write-Output "test"+$result
+    #$timestamp[0]
+    $servicename ='DKMS.Kiosk.TMSApp'
+   
+    #$date
+    $ts = New-TimeSpan -start $previousdate -End $currenttime
+    
+     if($ts.TotalMinutes -ge 30)
+     {
+		Write-Host TMS exceed 30 min
+		Write-Host restarting service : $servicename
+		Restart-Service $servicename 
+		Write-Host Restarted service : $servicename
+     }
+	 
+	 else {
+		 write-host TMS is Stable! *****
+	 }
+       
