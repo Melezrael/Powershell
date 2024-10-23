@@ -57,7 +57,8 @@ Write-Host "6th Step: Password have been set  ---Done"
 
 #RENAME PC -Restart
 $hostname = Read-Host
-Rename-Computer -Newname $hostname       
+Rename-Computer -Newname $hostname
+Start-Sleep -Seconds 1.5
 Restart-computer
 Write-Host "Hostname Updated... Restarting....."
 
