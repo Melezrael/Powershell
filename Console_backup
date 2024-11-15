@@ -1,0 +1,17 @@
+#Backup Binaries
+
+function backup {
+
+$foldername = (Get-Date).ToString("dd-MM-yyyy")
+write-host "Please state site"
+$site = Read-Host
+New-Item -ItemType Directory -Path "D:\Apps\DKMS\$site\DKMSConsoleAppRemediation\backup" -Name ($foldername)
+Copy-Item "D:\Apps\DKMS\$site\DKMSConsoleAppRemediation\DKMS.ConsoleApp.exe" -Destination "D:\Apps\DKMS\$site\DKMSConsoleAppRemediation\backup\$foldername"
+Copy-Item "D:\Apps\DKMS\$site\DKMSConsoleAppRemediation\IniFiles\DKMSConfig.ini" -Destination "D:\Apps\DKMS\$site\DKMSConsoleAppRemediation\backup\$foldername"
+
+
+}
+
+
+
+backup
