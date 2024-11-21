@@ -1,0 +1,24 @@
+#replacex
+
+function Replacex {
+Write-Output "Please enter Site"
+$site = Read-Host
+$servicename = $site+"_DKMSRemediationConsoleAppService"
+
+Stop-service -Name $servicename -Force
+Start-Sleep -Seconds 1
+Write-Output "Stoping..." $servicename
+
+Write-Output "Replacing Exe..."
+Copy-Item "C:\temp\Deployment\DKMS.ConsoleApp.exe" -Destination "D:\Apps\DKMS\$site\DKMSConsoleAppRemediation" -force
+Copy-Item "C:\temp\Deployment\DKMSConfig.ini" -Destination "D:\Apps\DKMS\$site\DKMSConsoleAppRemediation\IniFiles" -force
+Start-Sleep -Seconds 1
+Write-Output "Copying complete..."
+
+Start-Service -Name $servicename 
+Write-Output $servicename "Started"
+
+Write-Output "Deployment Completed"
+
+}
+Replacex
