@@ -1,0 +1,23 @@
+(Get-Date).ToString('MM/dd/yyyy HH:mm')
+$servicename = 'PPT1_CEIClientService'
+$logfile = 'D:\Apps\LogFiles\DKMS\PPT1\CEIClient\CEIClient.log' -f (Get-Date).ToString('yyyyMMdd')
+$logTime = Get-ChildItem -Path $logfile
+
+
+if($logTime.LastWriteTime -le (Get-Date).AddMinutes(-5)) 
+{
+   
+    Write-Host restarting service : $servicename
+	Restart-Service $servicename
+	Write-Host Restarted service : $servicename
+    
+}
+
+else {
+
+Write-Output "CEIClient Stable!"
+
+}
+
+$arrService = Get-Service -Name $ServiceName
+Write-Output $arrService
