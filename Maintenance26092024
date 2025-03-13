@@ -29,7 +29,7 @@ else{
         # PPT
         $MD5HashApps=@('C:\DKMSRemediation\DKMS.Kiosk.WebApp.exe')  # ## file hash and version info
         $Process=@('DKMS.Kiosk.WebApp')  # ## cpu ram usage
-        $BackupFolders=@('C:\DKMSRemediation\log','C:\DKMSRemediation\transaction', 'C:\DKMSRemediation\LEDChangeStateTrace','C:\DKMSRemediation\PSLogs')
+        $BackupFolders=@('C:\DKMSRemediation\log','C:\DKMSRemediation\transaction', 'C:\DKMSRemediation\LEDChangeStateTrace','C:\DKMSRemediation\PSLogs', 'C:\DKMSRemediationTMS\log', 'C:\DKMSRemediationTMS\PSLogs')
         $ScreenshotApps=@('DKMS.Kiosk.WebApp')
     }
 }
