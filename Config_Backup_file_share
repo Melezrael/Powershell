@@ -1,0 +1,32 @@
+##Client download the SBC_Backup_Config from SBC shared drive
+$sourcefolder = "\\Sbc1\c\_Maintenance\BackupConfig"
+$targetfolder = "C:\_Maintenance\BackupConfig"
+$newestfolder = gci -Directory $sourcefolder | sort CreationTime -desc | select -f 1
+$targetfolder2 = gci -Directory $targetfolder | sort CreationTime -desc | select -f 1
+copy-item -Recurse $sourcefolder"\"$newestfolder $targetfolder"\"$targetfolder2
+
+
+##APP server donwload the BOTH Client and SBC config from Client shared drive
+$ppt1 = "\\Ppt1-p1\c\_Maintenance\BackupConfig"
+
+
+function newfolder {
+#Create new backup folder
+$filedate = Get-Date -Format "ddMMMMyyyy"
+New-Item -Path "D:\Backup_Config\$filedate" -ItemType Directory
+
+}
+
+
+function dwbackup {
+
+$sourcefolder = $ppt1
+$targetfolder = "D:\Backup_Config\$filedate" 
+$newestfolder = gci -Directory $sourcefolder | sort CreationTime -desc | select -f 1
+Write-Output $targetfolder
+copy-item -Recurse $sourcefolder"\"$newestfolder $targetfolder
+}
+
+
+newfolder
+dwbackup
