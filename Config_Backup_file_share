@@ -10,9 +10,9 @@ copy-item -Recurse $sourcefolder"\"$newestfolder $targetfolder"\"$targetfolder2
 $filedate = Get-Date -Format "ddMMMMyyyy"
 $configpath = "D:\Backup_Config\$filedate"
 
+
 $p1 = "\\Ppt1-p1\c\_Maintenance\BackupConfig"
-
-
+$kioskclient= $p1
 
 function newfolder {
 #Create new backup folder in D:\ drive App server
@@ -23,17 +23,23 @@ Write-Output "File created!"
 
 function dwbackup {
 
+foreach ($kiosk in $kioskclient)
+
+{
 #download backup from Client containing Client + SBC config
-$sourcefolder = $p1
+$sourcefolder = $kiosk
 $targetfolder = $configpath 
 $newestfolder = gci -Directory $sourcefolder | sort CreationTime -desc | select -f 1
 copy-item -Recurse $sourcefolder"\"$newestfolder $targetfolder
 
 Write-Output "Backup file successfully download"
-
 }
 
 
+}
+
 newfolder
 dwbackup
+
+
 
