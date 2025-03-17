@@ -1,11 +1,15 @@
+
+##installed to Client
 ##Client download the SBC_Backup_Config from SBC shared drive
 $sourcefolder = "\\Sbc1\c\_Maintenance\BackupConfig"
 $targetfolder = "C:\_Maintenance\BackupConfig"
+##Download the latest backup file
 $newestfolder = gci -Directory $sourcefolder | sort CreationTime -desc | select -f 1
 $targetfolder2 = gci -Directory $targetfolder | sort CreationTime -desc | select -f 1
 copy-item -Recurse $sourcefolder"\"$newestfolder $targetfolder"\"$targetfolder2
 
 
+#install to Appserver
 ##APP server donwload the BOTH Client and SBC config from Client shared drive
 $filedate = Get-Date -Format "ddMMMMyyyy"
 $configpath = "D:\Backup_Config\$filedate"
