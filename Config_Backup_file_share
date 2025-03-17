@@ -7,26 +7,33 @@ copy-item -Recurse $sourcefolder"\"$newestfolder $targetfolder"\"$targetfolder2
 
 
 ##APP server donwload the BOTH Client and SBC config from Client shared drive
-$ppt1 = "\\Ppt1-dkms-pc4\c\_Maintenance\BackupConfig"
+$filedate = Get-Date -Format "ddMMMMyyyy"
+$configpath = "D:\Backup_Config\$filedate"
+
+$p1 = "\\Ppt1-p1\c\_Maintenance\BackupConfig"
+
 
 
 function newfolder {
-#Create new backup folder
-$filedate = Get-Date -Format "ddMMMMyyyy"
-New-Item -Path "D:\Backup_Config\$filedate" -ItemType Directory
-
+#Create new backup folder in D:\ drive App server
+New-Item -Path $configpath -ItemType Directory
+Write-Output "File created!"
 }
 
 
 function dwbackup {
-$filedate = Get-Date -Format "ddMMMMyyyy"
-$sourcefolder = $ppt1
-$targetfolder = "D:\Backup_Config\$filedate" 
+
+#download backup from Client containing Client + SBC config
+$sourcefolder = $p1
+$targetfolder = $configpath 
 $newestfolder = gci -Directory $sourcefolder | sort CreationTime -desc | select -f 1
-Write-Output $targetfolder
 copy-item -Recurse $sourcefolder"\"$newestfolder $targetfolder
+
+Write-Output "Backup file successfully download"
+
 }
 
 
 newfolder
 dwbackup
+
