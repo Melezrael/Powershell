@@ -1,6 +1,8 @@
 #script will run once a month for backup DKMS Kiosk application
 #backup Kiosk and TMS config
 
+function BackupConfig {
+
 $dkmsmbfile = "C:\DKMS\DKMSKiosk.exe.config", "C:\DKMS\kiosk.ini"
 $dkmsctfile = "C:\DKMSClient\kiosk.ini", "C:\DKMSClient\AppSettings.config", "C:\DKMSClient\Site-Configs.xml", "C:\DKMSClient\DKMSKiosk.exe.config"
 $dkmsRfile = "C:\DKMSRemediation\appsettings.json", "C:\DKMSRemediation\kiosk.ini"
@@ -11,8 +13,6 @@ $tmsfile = "C:\DKMSRemediationTMS\appsettings.json", "C:\DKMSRemediationTMS\kios
 $filedate = Get-Date -Format "ddMMMMyyyy"
 #$source = 'C:\_Maintenance\BackupConfig_$formattedDateTime'
 $kiosk = "$env:COMPUTERNAME" 
-
-function BackupConfig {
 
 if(test-path 'C:\DKMSClient')
     {
@@ -26,6 +26,10 @@ if(test-path 'C:\DKMSClient')
         New-Item -Path "C:\_Maintenance\BackupConfig\$filedate\$kiosk" -ItemType Directory
         Compress-Archive -Path $dkmsRfile -DestinationPath "C:\_Maintenance\BackupConfig\$filedate\$kiosk\Clientbackup"
         Write-Output "DKMSRemediation config backup successfully!"
+                if(test-path 'C:\DKMSRemediationTMS'){
+                    Compress-Archive -Path $tmsfile -DestinationPath "C:\_Maintenance\BackupConfig\$filedate\$kiosk\TMSbackup"
+                    Write-Output "TMS config backup done!"
+                    }
         }
 
             elseif(test-path 'C:\DKMS')
@@ -55,27 +59,4 @@ if(test-path 'C:\DKMSClient')
 
 
 
-
-function BackupTms {
-
-if(test-path 'C:\DKMSRemediationTMS')
-
-    {
-    
-    New-Item -Path "C:\_Maintenance\BackupConfig\$filedate\$tmskiosk" -ItemType Directory
-    Compress-Archive -Path $tmsfile -DestinationPath "C:\_Maintenance\BackupConfig\$filedate\$kiosk\TMSbackup"
-    Write-Output "TMS config backup done!"
-    }
-
-        else
-        { 
-        Write-Output "No TMS present"
-        
-        }
-
-        }
-
-    
-
 BackupConfig
-BackupTms
