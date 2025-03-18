@@ -870,6 +870,69 @@ elseif(test-Path 'C:\DKMSRemediation'){
 (Get-EventLog -LogName System -Source "Service Control Manager" -after (Get-Date).AddDays(-10) | Select-Object -Property TimeGenerated, EntryType, Source, Message) -match $servicename | Sort-Object TimeGenerated | Format-Table -AutoSize -Wrap | Out-File -FilePath $restart_history_outfilepath
 }
 
+#script will run once a month for backup DKMS Kiosk application
+#backup Kiosk and TMS config
+
+function BackupConfig {
+
+$dkmsmbfile = "C:\DKMS\DKMSKiosk.exe.config", "C:\DKMS\kiosk.ini"
+$dkmsctfile = "C:\DKMSClient\kiosk.ini", "C:\DKMSClient\AppSettings.config", "C:\DKMSClient\Site-Configs.xml", "C:\DKMSClient\DKMSKiosk.exe.config"
+$dkmsRfile = "C:\DKMSRemediation\appsettings.json", "C:\DKMSRemediation\kiosk.ini"
+$sbcmbfile = "C:\SBCApp\SBC.exe.config", "C:\SBCApp\config.xml" , "C:\SBCApp\web.config"
+$sbcRfile = "C:\SBCRemediation\appsettings.json", "C:\SBCRemediation\Config.xml", "C:\SBCRemediation\log4net.config" 
+$tmsfile = "C:\DKMSRemediationTMS\appsettings.json", "C:\DKMSRemediationTMS\kiosk.ini"
+
+$filedate = Get-Date -Format "ddMMMMyyyy"
+#$source = 'C:\_Maintenance\BackupConfig_$formattedDateTime'
+$kiosk = "$env:COMPUTERNAME" 
+
+if(test-path 'C:\DKMSClient')
+    {
+    New-Item -Path "C:\_Maintenance\BackupConfig\$filedate\$kiosk" -ItemType Directory
+    Compress-Archive -Path $dkmsctfile -DestinationPath "C:\_Maintenance\BackupConfig\$filedate\$kiosk\Clientbackup"
+    Write-Output "DKMSClient config backup successfully!"
+    }
+
+        elseif(test-path 'C:\DKMSRemediation')
+        { 
+        New-Item -Path "C:\_Maintenance\BackupConfig\$filedate\$kiosk" -ItemType Directory
+        Compress-Archive -Path $dkmsRfile -DestinationPath "C:\_Maintenance\BackupConfig\$filedate\$kiosk\Clientbackup"
+        Write-Output "DKMSRemediation config backup successfully!"
+                if(test-path 'C:\DKMSRemediationTMS'){
+                    Compress-Archive -Path $tmsfile -DestinationPath "C:\_Maintenance\BackupConfig\$filedate\$kiosk\TMSbackup"
+                    Write-Output "TMS config backup done!"
+                    }
+        }
+
+            elseif(test-path 'C:\DKMS')
+            { 
+           New-Item -Path "C:\_Maintenance\BackupConfig\$filedate\$kiosk" -ItemType Directory
+            Compress-Archive -Path $dkmsmbfile -DestinationPath "C:\_Maintenance\BackupConfig\$filedate\$kiosk\Clientbackup"
+            Write-Output "DKMS config backup successfully!"
+           
+            }
+
+                elseif (test-path 'C:\SBCApp')
+                {
+                New-Item -Path "C:\_Maintenance\BackupConfig\$filedate\$kiosk" -ItemType Directory
+                 Compress-Archive -Path $sbcfile -DestinationPath "C:\_Maintenance\BackupConfig\$filedate\$kiosk\SBCbackup"
+                 Write-Output "SBC config backup successfully!"
+                }
+
+                    else
+                    {
+                    New-Item -Path "C:\_Maintenance\BackupConfig\$filedate\$kiosk" -ItemType Directory
+                    Compress-Archive -Path $sbcRfile -DestinationPath "C:\_Maintenance\BackupConfig\$filedate\$kiosk\SBCbackup"
+                    Write-Output "SBCRemediation config backup successfully!"
+                    }
+  
+
+    }
+
+
+
+
+
  
 
 	
@@ -901,6 +964,7 @@ Function DoAll(){
     DisableTaskSchedular($true)
     ZipAll
 	DisableTaskSchedular($false)
+    BackupConfig
 	
     
 }
