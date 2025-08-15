@@ -1,3 +1,61 @@
 ##DISKCLEANUP
 ##C:\Users\User\AppData\Local\Temp
 ##C:\temp
+# Start logging
+$logPath = "C:\_Maintenance$(Get-Date -Format 'yyyyMMdd_HHmmss').txt"
+Start-Transcript -Path $logPath -Append
+
+# Temp folders to clean
+$tempFolders = @(
+    "$env:SystemRoot\Temp",
+    "$env:TEMP",
+    "$env:LOCALAPPDATA\Temp"
+)
+
+foreach ($folder in $tempFolders) {
+    if (Test-Path $folder) {
+        Write-Output "Cleaning $folder..."
+        Remove-Item "$folder\*" -Recurse -Force -ErrorAction SilentlyContinue
+    } else {
+        Write-Output "$folder does not exist, skipping."
+    }
+}
+
+# Empty Recycle Bin
+Write-Output "Emptying Recycle Bin..."
+Clear-RecycleBin -Force -ErrorAction SilentlyContinue
+
+# Clean Windows Update cache
+$wuCache = "$env:SystemRoot\SoftwareDistribution\Download"
+if (Test-Path $wuCache) {
+    Write-Output "Cleaning Windows Update cache..."
+    Remove-Item "$wuCache\*" -Recurse -Force -ErrorAction SilentlyContinue
+} else {
+    Write-Output "Windows Update cache folder not found, skipping."
+}
+
+# Clean Prefetch files
+$prefetchFolder = "$env:SystemRoot\Prefetch"
+if (Test-Path $prefetchFolder) {
+    Write-Output "Cleaning Prefetch files..."
+    Remove-Item "$prefetchFolder\*" -Recurse -Force -ErrorAction SilentlyContinue
+} else {
+    Write-Output "Prefetch folder not found, skipping."
+}
+
+Write-Output "Disk cleanup completed (Downloads folder untouched)."
+
+# Function to defragment disk
+function Defrag-Disk {
+    param([char]$DriveLetter)
+
+    Write-Output "Starting disk defragmentation on $DriveLetter :"
+    Optimize-Volume -DriveLetter $DriveLetter -Defrag -Verbose
+    Write-Output "Disk defragmentation completed."
+}
+
+# Call defrag function on C:
+Defrag-Disk -DriveLetter 'C'
+
+# Stop logging
+Stop-Transcript
