@@ -6,6 +6,7 @@ $DeleteEventLogs=1  # 1: delete,  0: no delete.  use this for testing script
 
 # ============== Begin Config 
 
+#SBCRemediation-PC
 if(test-Path 'C:\SBCRemediation'){
     # SBC Computer
     $MD5HashApps=@('c:\SBCRemediation\DKMS.SBC.WebApp.exe')  # ## file hash and version info
@@ -17,7 +18,7 @@ if(test-Path 'C:\SBCRemediation'){
 else{
     
     # Kiosk Computer
-
+##CT-PC/Old-DKMS
     if(test-Path 'C:\DKMSClient'){
         ## KT/BT
         $MD5HashApps=@('C:\DKMSClient\DKMSKiosk.exe')  # ## file hash and version info
@@ -26,7 +27,7 @@ else{
         $ScreenshotApps=@('DKMSKiosk')
     }
     else{
-        # PPT
+        # PPT/MB-PC
         $MD5HashApps=@('C:\DKMSRemediation\DKMS.Kiosk.WebApp.exe')  # ## file hash and version info
         $Process=@('DKMS.Kiosk.WebApp')  # ## cpu ram usage
         $BackupFolders=@('C:\DKMSRemediation\log','C:\DKMSRemediation\transaction', 'C:\DKMSRemediation\LEDChangeStateTrace','C:\DKMSRemediation\PSLogs', 'C:\DKMSRemediationTMS\log', 'C:\DKMSRemediationTMS\PSLogs')
