@@ -1,0 +1,40 @@
+function Take-WebScreenshot {
+    # Get Local IP
+    $ip = (Get-NetIPAddress -AddressFamily IPv4 -PrefixOrigin Dhcp,Manual |
+  Where-Object { $_.IPAddress -like '192.168.*' } |
+  Sort-Object SkipAsSource |
+  Select-Object -ExpandProperty IPAddress -First 1)
+    $url = 'http://' + $ip + ':5002'
+    $outputPath = "C:\Temp\fullpage.png"
+    $chromePath = "C:\Program Files\Google\Chrome\Application\chrome.exe"
+
+    # Check if Chrome exists
+    if (-not (Test-Path $chromePath)) {
+        Write-Error "Chrome not found at $chromePath"
+        return
+    }
+
+    # Chrome command-line arguments
+    $arguments = @(
+        "--headless"
+        "--disable-gpu"
+        "--window-size=1280,1024"
+        "--screenshot=`"$outputPath`""
+        "--full-page"
+        "--virtual-time-budget=10000"  # Wait 5 seconds for page to fully load
+        "`"$url`""
+    )
+
+    # Run Chrome to take screenshot
+    Start-Process -FilePath $chromePath -ArgumentList $arguments -NoNewWindow -Wait
+
+    # Verify if screenshot was saved
+    if (Test-Path $outputPath) {
+        Write-Host "✅ Screenshot saved to: $outputPath"
+    } else {
+        Write-Error "❌ Failed to capture screenshot."
+    }
+}
+
+# Run the function
+Take-WebScreenshot
