@@ -878,8 +878,8 @@ function BackupConfig {
 $dkmsmbfile = "C:\DKMS\DKMSKiosk.exe.config", "C:\DKMS\kiosk.ini"
 $dkmsctfile = "C:\DKMSClient\kiosk.ini", "C:\DKMSClient\AppSettings.config", "C:\DKMSClient\Site-Configs.xml", "C:\DKMSClient\DKMSKiosk.exe.config"
 $dkmsRfile = "C:\DKMSRemediation\appsettings.json", "C:\DKMSRemediation\kiosk.ini"
-$sbcmbfile = "C:\SBCApp\SBC.exe.config", "C:\SBCApp\config.xml" , "C:\SBCApp\web.config"
-$sbcRfile = "C:\SBCRemediation\appsettings.json", "C:\SBCRemediation\Config.xml", "C:\SBCRemediation\log4net.config" 
+$sbcmbfile = "C:\SBCApp\SBC.exe.config", "C:\SBCApp\config.xml" 
+$sbcRfile = "C:\SBCRemediation\appsettings.json", "C:\SBCRemediation\Config.xml" 
 $tmsfile = "C:\DKMSRemediationTMS\appsettings.json", "C:\DKMSRemediationTMS\kiosk.ini"
 
 $filedate = Get-Date -Format "ddMMMMyyyy"
