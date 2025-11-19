@@ -1,0 +1,224 @@
+# ===== CONFIG =====
+$SbcServiceName = 'DKMS.SBC.WebApp'
+$RfidIp         = '192.168.0.100'
+$RfidPort       = 10001
+$MaxThreads     = 50
+# ==================
+
+function Get-SBCURL {
+    $jsonpath = "C:\SBCRemediation\appsettings.json"
+    if (-not (Test-Path -Path $jsonpath)) {
+        Write-Host "Invalid path: $jsonpath"
+        return
+    }
+
+    $jsondata = Get-Content -Path $jsonpath -Raw | ConvertFrom-Json
+    $SBCsettingfilter = $jsondata.Kestrel
+    return $SBCsettingfilter.Endpoints.Http.Url
+}
+
+function StopPendingSBCProcess {
+    param([string]$servicename)
+
+    $service = Get-WmiObject -Class win32_service -Filter "name='$servicename' and state='stop pending'"
+    if ($service) {
+        try {
+            Stop-Process -Id $service.ProcessId -Force -ErrorAction Stop
+            Write-Host "Stopped service '$servicename' with status: stop pending"
+            return $true
+        }
+        catch {
+            Write-Host "Failed to stop service '$servicename' with status: stop pending - $($_.Exception.Message)"
+            return $false
+        }
+    }
+    else {
+        return $false
+    }
+}
+
+function StartSBCService {
+    param([string]$servicename)
+
+    $service = Get-Service -Name $servicename -ErrorAction SilentlyContinue
+    if (-not $service) {
+        Write-Host "Service $servicename not found."
+        return
+    }
+
+    $status = StopPendingSBCProcess -servicename $servicename
+
+    if (-not $status -and $service.Status -ne 'Running') {
+        Start-Service $servicename
+        Write-Host "Starting service $servicename"
+    }
+
+    $currenttime = Get-Date
+    Write-Host "Service $servicename status: $((Get-Service $servicename).Status) at: $currenttime"
+}
+
+function StopSBCProcess {
+    param([string]$servicename)
+
+    Write-Host "==== Stopping service + process for $servicename ===="
+
+    try {
+        $svc = Get-Service -Name $servicename -ErrorAction SilentlyContinue
+        if ($svc -and $svc.Status -ne 'Stopped') {
+            Write-Host "Stopping Windows service $servicename ..."
+            Stop-Service -Name $servicename -Force -ErrorAction Stop
+        }
+    }
+    catch {
+        Write-Host "Failed to stop service $servicename via Stop-Service: $($_.Exception.Message)"
+    }
+
+    Start-Sleep -Seconds 3
+
+    try {
+        $procs = Get-Process -Name $servicename -ErrorAction SilentlyContinue
+        if (-not $procs) {
+            $procs = Get-Process | Where-Object { $_.ProcessName -like "$servicename*" }
+        }
+
+        if ($procs) {
+            Write-Host "Killing leftover process(es) for $servicename : $($procs.ProcessName -join ', ') (PID(s): $($procs.Id -join ', '))"
+            $procs | Stop-Process -Force -ErrorAction SilentlyContinue
+        }
+        else {
+            Write-Host "No leftover processes found for $servicename."
+        }
+    }
+    catch {
+        Write-Host "Error while killing processes for $servicename : $($_.Exception.Message)"
+    }
+
+    Write-Host "==== StopSBCProcess completed for $servicename ===="
+}
+
+function Restart-SBCWebApp {
+    param([string]$servicename = $SbcServiceName)
+
+    Write-Host "##### Restarting $servicename (service + process) #####"
+    StopSBCProcess  -servicename $servicename
+    StartSBCService -servicename $servicename
+    Write-Host "##### Restart of $servicename completed #####"
+}
+
+# ---- RFID CHECK (PING + TCP, but NO restart here) ----
+function Test-RfidPort {
+    [CmdletBinding()]
+    param(
+        [string]$IpAddress = $RfidIp,
+        [int]   $Port      = $RfidPort
+    )
+
+    Write-Host "Pinging RFID IP $IpAddress ..."
+    $pingOk = Test-Connection -ComputerName $IpAddress -Count 1 -Quiet -ErrorAction SilentlyContinue
+    if (-not $pingOk) {
+        Write-Host "Ping failed: $IpAddress NOT reachable. (No restart based on ping.)"
+        return $false
+    }
+
+    Write-Host "Ping success: $IpAddress reachable. Checking TCP port $Port ..."
+    $connected = Test-NetConnection -ComputerName $IpAddress -Port $Port -InformationLevel Quiet -WarningAction SilentlyContinue
+
+    if ($connected) {
+        Write-Host "RFID TCP port $IpAddress`:$Port reachable (WARNING: SBC LOST CONNECTION TO RFID READER)."
+    }
+
+    else {
+        Write-Host "RFID TCP port $IpAddress`:$Port NOT reachable, SBC CONNECTION TO RFID READER ESTABLISHED (GOOD: SBC CONNECTION TO RFID READER STABLE..)."
+    }
+    return $connected
+}
+# ------------------------------------------------------
+
+function monitorSBCWebsite {
+    $currenttime = Get-Date
+    $proc = Get-Process $SbcServiceName -ErrorAction SilentlyContinue
+    $sbcThreads = if ($proc) { $proc.Threads.Count } else { 0 }
+
+    Write-Host "*** Started at: $currenttime with threads: $sbcThreads ****"
+
+    $sbcurl = Get-SBCURL
+    if (-not $sbcurl) {
+        Write-Host "Config path is invalid, aborting script execution"
+        return
+    }
+
+    if ($sbcThreads -gt $MaxThreads) {
+        Write-Host "Initiating SBC restart, threads reached limit $MaxThreads (current: $sbcThreads)"
+        Restart-SBCWebApp
+        return
+    }
+
+    $HTTP_Response = $null
+    $HTTP_Status   = $null
+
+    try {
+        $HTTP_Request = [System.Net.WebRequest]::Create("$sbcurl/sbc/lanestatus")
+        Write-Host "Connecting to SBC Url: $($HTTP_Request.RequestURI)"
+
+        $HTTP_Response = $HTTP_Request.GetResponse()
+        $Data_stream   = $HTTP_Response.GetResponseStream()
+        $streamreader  = New-Object System.IO.StreamReader $Data_stream
+        $result        = $streamreader.ReadToEnd()
+        $streamreader.Close()
+
+        $kiosk = $result | ConvertFrom-Json
+
+        $ledState                    = $kiosk.data.ledState
+        $ledStateblue                = $kiosk.data | Where-Object { $_.ledState -eq "Blue" }
+        $leDonBlueLastTimeStamp      = $kiosk.data.leDonBlueLastTimeStamp
+        $rfidLastDetectedTimeStamp   = $kiosk.data.rfidLastDetectedTimeStamp
+        $rfidLastTagRequestTimeStamp = $kiosk.data.rfidLastTagRequestTimeStamp
+        $rfididLastDetected          = $kiosk.data.rfididLastDetected
+
+        Write-Host "currentledState: $ledState, ledStateblue: $($ledStateblue.Count -gt 0), leDonBlueLastTimeStamp: $leDonBlueLastTimeStamp, rfidLastDetectedTimeStamp: $rfidLastDetectedTimeStamp, rfidLastTagRequestTimeStamp: $rfidLastTagRequestTimeStamp, rfididLastDetected: $rfididLastDetected"
+
+        if ($kiosk.code -eq 200 -and $ledStateblue) {
+            $now = Get-Date
+            $ts  = New-TimeSpan -Start $leDonBlueLastTimeStamp -End $now
+
+            if ($ts.Minutes -gt 4) {
+                Write-Host "Continuous blue light started at: $leDonBlueLastTimeStamp, on for minutes: $($ts.Minutes)"
+                # optional: Restart-SBCWebApp
+            }
+            else {
+                Write-Host "No continuous blue light at: $now"
+            }
+        }
+
+        $HTTP_Status = [int]$HTTP_Response.StatusCode
+        if ($HTTP_Status -eq 200) {
+            $currenttime = Get-Date
+            Write-Host "*** Site is OK! Ended at: $currenttime ****"
+        }
+
+        # MAIN CONDITION:
+        # SBC HTTP = 200 AND RFID TCP reachable -> restart
+        $rfidPortOk = Test-RfidPort
+        if ($HTTP_Status -eq 200 -and $rfidPortOk) {
+            Write-Host "SBC website reachable AND RFID port reachable (WARNING: RESTART REQUIRED!!!) -> restarting $SbcServiceName ..."
+            Restart-SBCWebApp
+            Write-Host "Service restart triggered due to SBC+RFID (HTTP+TCP) condition."
+        }
+        else {
+            Write-Host "Combined check result: SBC HTTP=$HTTP_Status, RFID TCP reachable=$rfidPortOk (NO RESTART)."
+        }
+    }
+    catch {
+        Write-Host "The site may be down, please check!"
+        $endtime = Get-Date
+        Restart-SBCWebApp
+        Write-Host "$SbcServiceName restarted due to exception. Script ended at: $endtime"
+    }
+    finally {
+        if ($HTTP_Response -ne $null) {
+            $HTTP_Response.Close()
+        }
+    }
+}
+
+monitorSBCWebsite
