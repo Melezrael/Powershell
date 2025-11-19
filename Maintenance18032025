@@ -909,7 +909,7 @@ if(test-path 'C:\DKMSClient')
                     else
                     {
                     New-Item -Path "C:\_Maintenance\BackupConfig\$filedate\$kiosk" -ItemType Directory
-                    Compress-Archive -Path $sbcRfile -DestinationPath "C:\_Maintenance\BackupConfig\$filedate\$kiosk\SBCbackup"
+                    Compress-Archive -Path $dkmsRemediationfile -DestinationPath "C:\_Maintenance\BackupConfig\$filedate\$kiosk\SBCbackup"
                     Write-Output "SBCRemediation config backup successfully!"
                     }
   
