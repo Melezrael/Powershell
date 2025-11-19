@@ -890,35 +890,21 @@ $kiosk = "$env:COMPUTERNAME"
 if(test-path 'C:\DKMSClient')
     {
     New-Item -Path "C:\_Maintenance\BackupConfig\$filedate\$kiosk" -ItemType Directory
-    Compress-Archive -Path $dkmsctfile -DestinationPath "C:\_Maintenance\BackupConfig\$filedate\$kiosk\Clientbackup"
+    Compress-Archive -Path $dkmsOldfile -DestinationPath "C:\_Maintenance\BackupConfig\$filedate\$kiosk\Clientbackup"
     Write-Output "DKMSClient config backup successfully!"
     }
 
         elseif(test-path 'C:\DKMSRemediation')
         { 
         New-Item -Path "C:\_Maintenance\BackupConfig\$filedate\$kiosk" -ItemType Directory
-        Compress-Archive -Path $dkmsRfile -DestinationPath "C:\_Maintenance\BackupConfig\$filedate\$kiosk\Clientbackup"
+        Compress-Archive -Path $dkmsRemediationfile -DestinationPath "C:\_Maintenance\BackupConfig\$filedate\$kiosk\Clientbackup"
         Write-Output "DKMSRemediation config backup successfully!"
+
                 if(test-path 'C:\DKMSRemediationTMS'){
                     Compress-Archive -Path $tmsfile -DestinationPath "C:\_Maintenance\BackupConfig\$filedate\$kiosk\TMSbackup"
                     Write-Output "TMS config backup done!"
                     }
         }
-
-            elseif(test-path 'C:\DKMS')
-            { 
-           New-Item -Path "C:\_Maintenance\BackupConfig\$filedate\$kiosk" -ItemType Directory
-            Compress-Archive -Path $dkmsmbfile -DestinationPath "C:\_Maintenance\BackupConfig\$filedate\$kiosk\Clientbackup"
-            Write-Output "DKMS config backup successfully!"
-           
-            }
-
-                elseif (test-path 'C:\SBCApp')
-                {
-                New-Item -Path "C:\_Maintenance\BackupConfig\$filedate\$kiosk" -ItemType Directory
-                 Compress-Archive -Path $sbcfile -DestinationPath "C:\_Maintenance\BackupConfig\$filedate\$kiosk\SBCbackup"
-                 Write-Output "SBC config backup successfully!"
-                }
 
                     else
                     {
