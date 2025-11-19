@@ -2,11 +2,12 @@
 #backup Kiosk and TMS config
 
 function BackupConfig {
-
+#DKMS_file
 $dkmsOldfile = "C:\DKMSClient\kiosk.ini", "C:\DKMSClient\AppSettings.config", "C:\DKMSClient\DKMSKiosk.exe.config"
 $dkmsRemediationfile = "C:\DKMSRemediation\appsettings.json", "C:\DKMSRemediation\kiosk.ini"
-$sbcmbfile = "C:\SBCApp\SBC.exe.config", "C:\SBCApp\config.xml" , "C:\SBCApp\web.config"
-$sbcRfile = "C:\SBCRemediation\appsettings.json", "C:\SBCRemediation\Config.xml", "C:\SBCRemediation\log4net.config" 
+
+#SBC_FILE
+$sbcRemediationfile = "C:\SBCRemediation\appsettings.json", "C:\SBCRemediation\Config.xml"
 $tmsfile = "C:\DKMSRemediationTMS\appsettings.json", "C:\DKMSRemediationTMS\kiosk.ini"
 
 $filedate = Get-Date -Format "ddMMMMyyyy"
@@ -49,7 +50,7 @@ if(test-path 'C:\DKMSClient')
                     else
                     {
                     New-Item -Path "C:\_Maintenance\BackupConfig\$filedate\$kiosk" -ItemType Directory
-                    Compress-Archive -Path $sbcRfile -DestinationPath "C:\_Maintenance\BackupConfig\$filedate\$kiosk\SBCbackup"
+                    Compress-Archive -Path $sbcRemediationfile -DestinationPath "C:\_Maintenance\BackupConfig\$filedate\$kiosk\SBCbackup"
                     Write-Output "SBCRemediation config backup successfully!"
                     }
   
