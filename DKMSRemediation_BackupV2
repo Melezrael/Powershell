@@ -3,9 +3,8 @@
 
 function BackupConfig {
 
-$dkmsmbfile = "C:\DKMS\DKMSKiosk.exe.config", "C:\DKMS\kiosk.ini"
-$dkmsctfile = "C:\DKMSClient\kiosk.ini", "C:\DKMSClient\AppSettings.config", "C:\DKMSClient\Site-Configs.xml", "C:\DKMSClient\DKMSKiosk.exe.config"
-$dkmsRfile = "C:\DKMSRemediation\appsettings.json", "C:\DKMSRemediation\kiosk.ini"
+$dkmsOldfile = "C:\DKMSClient\kiosk.ini", "C:\DKMSClient\AppSettings.config", "C:\DKMSClient\DKMSKiosk.exe.config"
+$dkmsRemediationfile = "C:\DKMSRemediation\appsettings.json", "C:\DKMSRemediation\kiosk.ini"
 $sbcmbfile = "C:\SBCApp\SBC.exe.config", "C:\SBCApp\config.xml" , "C:\SBCApp\web.config"
 $sbcRfile = "C:\SBCRemediation\appsettings.json", "C:\SBCRemediation\Config.xml", "C:\SBCRemediation\log4net.config" 
 $tmsfile = "C:\DKMSRemediationTMS\appsettings.json", "C:\DKMSRemediationTMS\kiosk.ini"
@@ -17,14 +16,14 @@ $kiosk = "$env:COMPUTERNAME"
 if(test-path 'C:\DKMSClient')
     {
     New-Item -Path "C:\_Maintenance\BackupConfig\$filedate\$kiosk" -ItemType Directory
-    Compress-Archive -Path $dkmsctfile -DestinationPath "C:\_Maintenance\BackupConfig\$filedate\$kiosk\Clientbackup"
+    Compress-Archive -Path $dkmsOldfile -DestinationPath "C:\_Maintenance\BackupConfig\$filedate\$kiosk\Clientbackup"
     Write-Output "DKMSClient config backup successfully!"
     }
 
         elseif(test-path 'C:\DKMSRemediation')
         { 
         New-Item -Path "C:\_Maintenance\BackupConfig\$filedate\$kiosk" -ItemType Directory
-        Compress-Archive -Path $dkmsRfile -DestinationPath "C:\_Maintenance\BackupConfig\$filedate\$kiosk\Clientbackup"
+        Compress-Archive -Path $dkmsRemediationfile -DestinationPath "C:\_Maintenance\BackupConfig\$filedate\$kiosk\Clientbackup"
         Write-Output "DKMSRemediation config backup successfully!"
                 if(test-path 'C:\DKMSRemediationTMS'){
                     Compress-Archive -Path $tmsfile -DestinationPath "C:\_Maintenance\BackupConfig\$filedate\$kiosk\TMSbackup"
