@@ -1,0 +1,132 @@
+# =========================
+# 01Setup_box.ps1 (Clean)
+# =========================
+
+# -------- CONFIG (edit here only) --------
+$AppPath       = "C:\temp\01Setup_box"
+$Username      = "user"
+$PlainPassword = "password"          # change this (or use prompt method)
+$Hostname      = "RIS-SBC-DEFAULT"   # change this (leave "" to skip rename)
+
+# Switches (easy enable/disable)
+$DoInstallApps    = $true
+$DoSetUacLow      = $true
+$DoNeverSleep     = $true
+$DoEnableMSMQ     = $true
+$DoDisableFW      = $true
+$DoEnableRDP      = $true
+$DoSetPassword    = $true
+$DoRenameAndReboot= $true
+# ----------------------------------------
+
+function Step($msg) { Write-Host "`n=== $msg ===" -ForegroundColor Cyan }
+function Ok($msg)   { Write-Host "OK  - $msg" -ForegroundColor Green }
+
+# Admin check
+$isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()
+).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")
+if (-not $isAdmin) { Write-Host "ERROR: Please run PowerShell as Administrator." -ForegroundColor Red; exit 1 }
+
+# Do NOT change machine policy; bypass only for this script session
+Set-ExecutionPolicy Bypass -Scope Process -Force
+
+# Optional log (professional)
+$LogPath = "C:\temp\01Setup_box_$(Get-Date -Format 'yyyyMMdd_HHmmss').log"
+Start-Transcript -Path $LogPath -Force | Out-Null
+
+try {
+  # Validate app folder
+  if ($DoInstallApps -and -not (Test-Path $AppPath)) { throw "AppPath not found: $AppPath" }
+
+  # 1) Install applications
+  Step "Step 1: Install Applications"
+  if ($DoInstallApps) {
+    $PssMsi = Join-Path $AppPath "PSS_x86.msi"
+    $NppExe = Join-Path $AppPath "npp.8.8.8.Installer.x64.msi"
+    $ChrExe = Join-Path $AppPath "googlechromestandaloneenterprise64.msi"
+
+    Start-Process msiexec.exe -Wait -ArgumentList "/i `"$PssMsi`" /qn /norestart"
+    Start-Process msiexec.exe -Wait -ArgumentList "/i `"$NppExe`" /qn /norestart"
+    Start-Process msiexec.exe -Wait -ArgumentList "/i `"$ChrExe`" /qn /norestart"
+
+    Ok "PSS DOMS / Notepad++ / Chrome installed"
+  } else { Ok "Skipped" }
+
+  # 2) Set UAC low
+  Step "Step 2: UAC"
+  if ($DoSetUacLow) {
+    Set-ItemProperty -Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies\System" -Name EnableLUA -Value 0 -Force
+    Ok "UAC set low (reboot required to fully apply)"
+  } else { Ok "Skipped" }
+
+  # 3) Power never sleep
+  Step "Step 3: Power Never Sleep"
+  if ($DoNeverSleep) {
+    powercfg /change monitor-timeout-ac 0 | Out-Null
+    powercfg /change monitor-timeout-dc 0 | Out-Null
+    powercfg /change standby-timeout-ac 0 | Out-Null
+    powercfg /change standby-timeout-dc 0 | Out-Null
+    powercfg /hibernate off | Out-Null
+    Ok "Power set to never sleep + hibernate off"
+  } else { Ok "Skipped" }
+
+  # 4) MSMQ + queues (safe if run again)
+  Step "Step 4: MSMQ + Queues"
+  if ($DoEnableMSMQ) {
+    Enable-WindowsOptionalFeature -Online -FeatureName "MSMQ-Server" -All -NoRestart | Out-Null
+    Import-Module MSMQ -ErrorAction SilentlyContinue
+
+    $queues = "kioskqueuein","kioskqueueout","checkqueuein","checkqueueout"
+    foreach ($q in $queues) {
+      $exists = Get-MsmqQueue -QueueType Private -Name $q -ErrorAction SilentlyContinue
+      if (-not $exists) {
+        New-MsmqQueue -Name $q -QueueType Private -Transactional | Out-Null
+      }
+    }
+    Ok "MSMQ enabled + queues ensured"
+  } else { Ok "Skipped" }
+
+  # 5) Firewall off
+  Step "Step 5: Firewall"
+  if ($DoDisableFW) {
+    Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled False
+    Ok "Firewall disabled"
+  } else { Ok "Skipped" }
+
+  # 6) Enable RDP
+  Step "Step 6: Remote Desktop"
+  if ($DoEnableRDP) {
+    Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server" -Name "fDenyTSConnections" -Value 0
+    Enable-NetFirewallRule -DisplayGroup "Remote Desktop" -ErrorAction SilentlyContinue | Out-Null
+    Ok "RDP enabled"
+  } else { Ok "Skipped" }
+
+  # 7) Set local user password (no prompt)
+  Step "Step 7: Local User Password"
+  if ($DoSetPassword) {
+    $secure = ConvertTo-SecureString $PlainPassword -AsPlainText -Force
+    Set-LocalUser -Name $Username -Password $secure
+    Ok "Password set for $Username"
+  } else { Ok "Skipped" }
+
+  # 8) Rename + reboot
+  Step "Step 8: Rename + Reboot"
+  if ($DoRenameAndReboot) {
+    if ($Hostname -and $Hostname.Trim() -ne "") {
+      Rename-Computer -NewName $Hostname -Force
+      Ok "Hostname set to $Hostname"
+    } else {
+      Ok "Hostname skipped (empty)"
+    }
+
+    Ok "Restarting in 5 seconds..."
+    Start-Sleep -Seconds 5
+    Restart-Computer -Force
+  } else { Ok "Skipped" }
+
+} catch {
+  Write-Host "FAILED: $($_.Exception.Message)" -ForegroundColor Red
+} finally {
+  Stop-Transcript | Out-Null
+  Write-Host "Log saved: $LogPath"
+}
