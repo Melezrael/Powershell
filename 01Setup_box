@@ -1,4 +1,8 @@
-
+#Follow Instructions by number
+#-01- Insert USB to formatted/new box
+#-02- Locate /01Setup_box and copy the files
+#-03- Paste to C:/temp 
+#-04- Run 01Setup_box.ps1 as administrator
 
 #cmd able to machine run powershell script
 Set-ExecutionPolicy Unrestricted
@@ -41,26 +45,30 @@ New-MsmqQueue -Name "checkqueuein" -Queuetype Private -Transactional
 New-MsmqQueue -Name "checkqueueout" -Queuetype Private -Transactional 
 Write-Host "Third Step: MSMQ Turned On and PrivateQue Created ---Done"
 
-# turn off firewall
+#00turn off firewall
 Get-NetFirewallProfile | Format-Table Name, Enabled               
 Set-NetFirewallProfile -Profile Domain, Public, Private -Enabled False
 Write-Host "4th Step: Firewall TurnOff  ---Done"
 
-#setup remote desktop
+#00setup remote desktop
 Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -value 0
 Write-Host "5th Step: Remote Desktop Enabled  ---Done"
 
-#set password for User
-$pass = Read-Host "Need your help : Please enter default password " -AsSecureString
-Get-LocalUser -Name "User" | Set-LocalUser -Password $pass
-Write-Host "6th Step: Password have been set  ---Done"
+#00set-user-password
+$username = "user"
+$plainPassword = "password"   # <-- Default user/password
+$secure = ConvertTo-SecureString $plainPassword -AsPlainText -Force
+
+Set-LocalUser -Name $username -Password $secure
+Write-Host "Password set for $username"
 
 
-
-#RENAME PC -Restart
-$hostname = Read-Host
+#00set-hostname
+$hostname = RIS-SBC-DEFAULT
 Rename-Computer -Newname $hostname
-Start-Sleep -Seconds 1.5
+Write-Host "Hostname Updated... Restarting in 5 seconds."
+
+Start-Sleep -Seconds 5
 Restart-computer
 Write-Host "Hostname Updated... Restarting....."
 
