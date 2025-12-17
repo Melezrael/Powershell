@@ -7,6 +7,8 @@ $AppPath       = "C:\temp\01Setup_box"
 $Username      = "user"
 $PlainPassword = "password"          # change this (or use prompt method)
 $Hostname      = "RIS-SBC-DEFAULT"   # change this (leave "" to skip rename)
+$SourceBin = "C:\temp\01Setup_box"   # current folder\bin
+$DestBin   = "C:\"
 
 # Switches (easy enable/disable)
 $DoInstallApps    = $true
@@ -109,7 +111,16 @@ try {
     Ok "Password set for $Username"
   } else { Ok "Skipped" }
 
-  # 8) Rename + reboot
+# 8) Transfer Bin (no prompt)
+if (Test-Path $SourceBin) {
+  robocopy $SourceBin $DestBin /E /R:2 /W:2 /NFL /NDL /NP | Out-Null
+  Ok "Copied: $SourceBin -> $DestBin"
+} else {
+  Write-Host "WARN - Source bin folder not found: $SourceBin" -ForegroundColor Yellow
+}
+
+
+  # 9) Rename + reboot
   Step "Step 8: Rename + Reboot"
   if ($DoRenameAndReboot) {
     if ($Hostname -and $Hostname.Trim() -ne "") {
