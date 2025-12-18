@@ -7,8 +7,13 @@ $AppPath       = "C:\temp\01Setup_box"
 $Username      = "user"
 $PlainPassword = "password"          # change this (or use prompt method)
 $Hostname      = "RIS-SBC-DEFAULT"   # change this (leave "" to skip rename)
-$SourceBin = "C:\temp\01Setup_box\DKMSRemediation", "C:\temp\01Setup_box\SBCRemediation", "C:\temp\01Setup_box\DKMSRemediationTMS"   # current folder\bin
-$DestBin   = "C:\"
+# Copy multiple folders into C:\ (each folder becomes C:\<FolderName>\...)
+$SourceBins = @(
+  "C:\temp\01Setup_box\DKMSRemediation",
+  "C:\temp\01Setup_box\SBCRemediation",
+  "C:\temp\01Setup_box\DKMSRemediationTMS"
+)
+$DestRoot = "C:\"
 
 # Switches (easy enable/disable)
 $DoInstallApps    = $true
@@ -18,6 +23,7 @@ $DoEnableMSMQ     = $true
 $DoDisableFW      = $true
 $DoEnableRDP      = $true
 $DoSetPassword    = $true
+$DoCopyBins        = $true
 $DoRenameAndReboot= $true
 # ----------------------------------------
 
@@ -111,13 +117,13 @@ try {
     Ok "Password set for $Username"
   } else { Ok "Skipped" }
 
-# 8) Transfer Bin (no prompt)
-if (Test-Path $SourceBin) {
-  robocopy $SourceBin $DestBin /E /R:2 /W:2 /NFL /NDL /NP | Out-Null
-  Ok "Copied: $SourceBin -> $DestBin"
-} else {
-  Write-Host "WARN - Source bin folder not found: $SourceBin" -ForegroundColor Yellow
-}
+Step "Step 8: Transfer Bins"
+  if ($DoCopyBins) {
+    foreach ($src in $SourceBins) {
+      Copy-FolderToRoot -SourceFolder $src -DestRoot $DestRoot
+    }
+    Ok "All bin copy tasks completed"
+  } else { Ok "Skipped" }
 
 
   # 9) Rename + reboot
