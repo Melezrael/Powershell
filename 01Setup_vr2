@@ -7,7 +7,7 @@ $AppPath       = "C:\temp\01Setup_box"
 $Username      = "user"
 $PlainPassword = "password"          # change this (or use prompt method)
 $Hostname      = "RIS-SBC-DEFAULT"   # change this (leave "" to skip rename)
-$SourceBin = "C:\temp\01Setup_box"   # current folder\bin
+$SourceBin = "C:\temp\01Setup_box\DKMSRemediation", "C:\temp\01Setup_box\SBCRemediation", "C:\temp\01Setup_box\DKMSRemediationTMS"   # current folder\bin
 $DestBin   = "C:\"
 
 # Switches (easy enable/disable)
