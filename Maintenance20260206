@@ -8,9 +8,9 @@ $DeleteEventLogs=1  # 1: delete,  0: no delete.  use this for testing script
 
 if(test-Path 'C:\SBCRemediation'){
     # SBC Computer
-    $MD5HashApps=@('c:\SBCRemediation\DKMS.SBC.WebApp.exe')  # ## file hash and version info
+    $MD5HashApps=@('C:\SBCRemediation\DKMS.SBC.WebApp.exe')  # ## file hash and version info
     $Process=@('DKMS.SBC.WebApp')  # ## cpu ram usage
-    $BackupFolders=@('c:\SBCRemediation\log','c:\SBCRemediation\PSLogs')
+    $BackupFolders=@('C:\SBCRemediation\log','C:\SBCRemediation\PSLogs')
     #$ScreenshotApps=@('mspaint','notepad')
     #$ScreenshotApps=@()
 }
@@ -29,7 +29,7 @@ else{
         # PPT
         $MD5HashApps=@('C:\DKMSRemediation\DKMS.Kiosk.WebApp.exe')  # ## file hash and version info
         $Process=@('DKMS.Kiosk.WebApp')  # ## cpu ram usage
-        $BackupFolders=@('C:\DKMSRemediation\log','C:\DKMSRemediation\transaction', 'C:\DKMSRemediation\LEDChangeStateTrace', 'C:\DKMSRemediationTMS\log', 'C:\DKMSRemediationTMS\PSLogs')
+        $BackupFolders=@('C:\DKMSRemediation\log','C:\DKMSRemediation\transaction', 'C:\DKMSRemediation\LEDChangeStateTrace', 'C:\DKMSRemediationTMS\log')
         #$ScreenshotApps=@('DKMS.Kiosk.WebApp')
     }
 }
@@ -255,6 +255,7 @@ Function GetProcCpuRam(){
         @{Name="Memory (MB)"; Expression = {[Math]::Round(($_.workingSetPrivate / 1mb),2)}}
         @{Name="Disk (MB)"; Expression = {[Math]::Round(($_.IODataOperationsPersec / 1mb),2)}}
         @{Name="Path";Expression = {(Get-Process -Id $_.IDProcess).Path}}
+		
     )
 
     $ProcessCPU = Get-WmiObject -class Win32_PerfFormattedData_PerfProc_Process
@@ -390,6 +391,23 @@ Function BackupEventLog(){
    
 }
 
+function Test-FileIdle {
+    param([Parameter(Mandatory)] [string] $Path)
+
+    try {
+        $fs = [System.IO.File]::Open(
+            $Path,
+            [System.IO.FileMode]::Open,
+            [System.IO.FileAccess]::ReadWrite,
+            [System.IO.FileShare]::None
+        )
+        $fs.Close()
+        return $true
+    } catch {
+        return $false
+    }
+}
+
 function ZipAll(){
 
     Border "Archive Files" 
@@ -404,24 +422,44 @@ function ZipAll(){
         $target_folder = "$ArchiveFolder_Tmp"+"DKMS_Logs\$c\"
 
         New-Item -ItemType Directory -Force -Path $target_folder  | Out-Null
+##123
+
+
+
+
+
 
         #move files to DKMS_Logs
-        Get-ChildItem –Path $b |
-            Sort-Object LastWriteTime  |
-            Foreach-Object {
-            try{
-                $file = $_.FullName
-                if($Debug){
-                    Copy-Item $file  -Destination $target_folder
-                }
-                else{
-                    Move-Item $file  -Destination $target_folder
-                }
-                
-            }
-            catch{
+        # Skip if folder doesn't exist (prevents Get-ChildItem path not found)
+if (-not (Test-Path -LiteralPath $b)) {
+    prn "SKIP (missing folder): $b"
+    continue
+}
+
+Get-ChildItem -LiteralPath $b -File -Force -ErrorAction SilentlyContinue |
+    Sort-Object LastWriteTime |
+    ForEach-Object {
+
+        $file = $_.FullName
+
+        # Skip locked/in-use files (prevents Move-Item IO exception)
+        if (-not (Test-FileIdle -Path $file)) {
+            prn "SKIP (in use): $file"
+            return
+        }
+
+        try {
+            if ($Debug) {
+                Copy-Item -LiteralPath $file -Destination $target_folder -Force -ErrorAction Stop
+            } else {
+                Move-Item -LiteralPath $file -Destination $target_folder -Force -ErrorAction Stop
             }
         }
+        catch {
+            # Race condition: file became locked after the idle check
+            prn "SKIP (move failed): $file | $($_.Exception.Message)"
+        }
+    }
         #zip the moved files
         <#
         #return;
@@ -534,6 +572,8 @@ Function GenHTMLReport(){
   # ================== close html
   Add-Content $ReportFile "</body></html>"
 }
+
+
 Function DisableTaskSchedular($flag)
 {
 	if((test-Path 'C:\SBCRemediation') -and $flag){
@@ -547,22 +587,51 @@ Function DisableTaskSchedular($flag)
    
 }
 
-function CheckDKMSorSBCWinServiceStartTime
-{
-  
+function CheckDKMSorSBCWinServiceStartTime {
 
-if(test-Path 'C:\SBCRemediation')
-{
-	$servicename ='DKMS.SBC.WebApp'
-$restart_history_outfilepath = 'C:\SBCRemediation\PSLogs\SBCrestartHistory.txt'
-}
+    if (Test-Path 'C:\SBCRemediation') {
+        $servicename = 'DKMS.SBC.WebApp'
+        $restart_history_outfilepath = 'C:\SBCRemediation\log\SBCrestartHistory.txt'
+    }
+    elseif (Test-Path 'C:\DKMSRemediation') {
+        $servicename = 'DKMS.Kiosk.WebApp'
+        $restart_history_outfilepath = 'C:\DKMSRemediation\log\KioskrestartHistory.txt'
+    }
+    else {
+        prn "SKIP restart history: not SBCRemediation and not DKMSRemediation"
+        return
+    }
 
- 
-elseif(test-Path 'C:\DKMSRemediation'){
-	$servicename ='DKMS.Kiosk.WebApp'
-	$restart_history_outfilepath = 'C:\DKMSRemediation\PSLogs\KioskrestartHistory.txt'
-}
-(Get-EventLog -LogName System -Source "Service Control Manager" -after (Get-Date).AddDays(-10) | Select-Object -Property TimeGenerated, EntryType, Source, Message) -match $servicename | Sort-Object TimeGenerated | Format-Table -AutoSize -Wrap | Out-File -FilePath $restart_history_outfilepath
+    # Ensure folder exists (prevents Out-File path error)
+    $outDir = Split-Path -Parent $restart_history_outfilepath
+    if (-not (Test-Path $outDir)) {
+        New-Item -ItemType Directory -Path $outDir -Force | Out-Null
+    }
+
+    try {
+        # Pull events, but don't scream if no matches
+        $events = Get-EventLog -LogName System -Source "Service Control Manager" -After (Get-Date).AddDays(-30) -ErrorAction SilentlyContinue |
+                  Where-Object { $_.Message -match [regex]::Escape($servicename) } |
+                  Sort-Object TimeGenerated
+
+        if (-not $events -or $events.Count -eq 0) {
+            prn "INFO: No Service Control Manager events found for $servicename in last 30 days."
+            # still create the file so script doesn't fail
+            "No events found for $servicename in last 10 days. $(Get-Date)" |
+                Out-File -FilePath $restart_history_outfilepath -Encoding utf8 -Force
+            return
+        }
+
+        $events |
+            Select-Object TimeGenerated, EntryType, Source, Message |
+            Format-Table -AutoSize -Wrap |
+            Out-File -FilePath $restart_history_outfilepath -Encoding utf8 -Force
+
+        prn "Saved restart history to: $restart_history_outfilepath"
+    }
+    catch {
+        prn "SKIP restart history (error): $($_.Exception.Message)"
+    }
 }
 
 #script will run once a month for backup DKMS Kiosk application
@@ -570,16 +639,15 @@ elseif(test-Path 'C:\DKMSRemediation'){
 
 function BackupConfig {
 
-#$dkmsmbfile = "C:\DKMS\DKMSKiosk.exe.config", "C:\DKMS\kiosk.ini"
+
+#Target backup config
 $dkmsctfile = "C:\DKMSClient\kiosk.ini", "C:\DKMSClient\AppSettings.config", "C:\DKMSClient\Site-Configs.xml", "C:\DKMSClient\DKMSKiosk.exe.config"
 $dkmsRfile = "C:\DKMSRemediation\appsettings.json", "C:\DKMSRemediation\kiosk.ini"
-#$sbcmbfile = "C:\SBCApp\SBC.exe.config", "C:\SBCApp\config.xml" , "C:\SBCApp\web.config"
-$sbcRfile = "C:\SBCRemediation\appsettings.json", "C:\SBCRemediation\Config.xml", "C:\SBCRemediation\log4net.config" 
+$sbcRfile = "C:\SBCRemediation\appsettings.json", "C:\SBCRemediation\Config.xml"
 $tmsfile = "C:\DKMSRemediationTMS\appsettings.json", "C:\DKMSRemediationTMS\kiosk.ini"
 
 $currentDateTime = Get-Date
 $formattedDateTime = $currentDateTime.ToString("yyyyMMdd")
-#$source = 'C:\_Maintenance\BackupConfig_$formattedDateTime'
 $kiosk = "$env:COMPUTERNAME-$formattedDateTime" 
 
 
@@ -716,9 +784,6 @@ function Invoke-DiskCleanup {
 
 
 
-
- 
-
 	
 
 Function DoAll(){
@@ -726,13 +791,13 @@ Function DoAll(){
 	
     # create folder first in order to log
     New-Item -ItemType Directory -Force -Path $ArchiveFolder_Tmp  | Out-Null
-	Start-Transcript -Path "$ArchiveFolder_Tmp\maintenancelogs.log" -Append
-    #New-Item -ItemType Directory -Force -Path $ArchiveFolder_Final  | Out-Null
+	Start-Transcript -Path "$ArchiveFolder_Tmp\$ArchiveName.log" -Append
+    
         
-    prn "Maintenance Script Version : 2026-01-28"
+    prn "Maintenance Script Version : 2026-02-11"
     prn "Report Timestamp : $(get-date -f 'dddd yyyy/MM/dd HH:mm:ss')"
     
-    #ScreenShot # take screenshot first otherwised active app wont go to background
+    
 
     GetFileInfo
     CheckDKMSorSBCWinServiceStartTime
